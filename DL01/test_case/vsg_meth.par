@@ -1,0 +1,3 @@
+'dbdis'	= METHOD ('dbdis', 'dbcon', 'stati', dbgdl')
+500	= NSTATE (number of energy bins)
+
