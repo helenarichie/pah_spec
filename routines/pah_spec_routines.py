@@ -288,13 +288,12 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     print(f"Photon wavelength: {lambda_abs:.2f}, initial temperature: {temp_abs:.2f}")
 
     time_i, energy_i, temp_i = 0 * u.s, energy_abs, temp_abs
-    time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_abs.value], []
+    time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_i.value], []
     dt_unit, time_unit, temp_unit = None, None, None
     # ensure timestep is not changing too rapidly
     dE_max = 0.001
 
     while temp_i.value > 5:
-        temp_i = np.interp(energy_i.value, energy_arr.value, temp_arr.value) * u.K
 
         dE_dt = -trapezoid(4 * np.pi * planck_function_nu(nu_arr, temp_i) * cabs_arr, x=nu_arr)
 
@@ -303,6 +302,8 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
 
         energy_i -= dE
         time_i += dt
+
+        temp_i = np.interp(energy_i.value, energy_arr.value, temp_arr.value) * u.K
 
         dt_arr_out.append(dt.value)
         time_arr_out.append(time_i.value)
