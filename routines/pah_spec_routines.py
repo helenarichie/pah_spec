@@ -1,11 +1,9 @@
 from astropy.constants import c, h, k_B
 import astropy.units as u
-from mpmath import polylog, zeta, matrix
 import numpy as np
-from numpy import exp, log
+from numpy import exp
 import os
 from scipy.integrate import trapezoid
-import time
 
 
 def calc_cabs(wavelength_arr, radius_arr):
@@ -228,7 +226,7 @@ def calc_pah_energy(grain_radius, temp_arr):
     # Eq. 33 of Draine & Li (2001)
     if nc > nc_cutoff:
         energies = calc_pah_energy_debye(
-            temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
+            temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
         )
 
     # For grains smaller than size_cutoff, calculate energies by summing contributions from individual modes
