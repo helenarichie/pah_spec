@@ -61,10 +61,10 @@ def calc_cabs(wavelength_arr, radius_arr):
     )
 
     rho_C = 2.0 * u.g / u.cm**3
-    N_C = calc_N_C(radius_arr)  # number of Carbon atoms, Draine 2021
-    HC = 0.5 * np.ones_like(N_C)  # Note that this is from Equation 4 of DL07
-    HC[(N_C >= 25) & (N_C <= 100)] = 0.5 * np.sqrt(25 / N_C[(N_C >= 25) & (N_C <= 100)])
-    HC[N_C > 100] = 0.25
+    nc = calc_nc(radius_arr)  # number of Carbon atoms, Draine 2021
+    HC = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07
+    HC[(nc >= 25) & (nc <= 100)] = 0.5 * np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
+    HC[nc > 100] = 0.25
     xi_gra = np.zeros_like(radius_arr.value)
     xi_gra[radius_arr < 50 * u.AA] = 0.01
     xi_gra[radius_arr >= 50 * u.AA] = 0.01 + 0.99 * (1.0 - (50 * u.AA / radius_arr[radius_arr >= 50 * u.AA]) ** 3)
@@ -87,8 +87,8 @@ def calc_cabs(wavelength_arr, radius_arr):
         return np.arctan(1.0e3 * (y - 1.0) ** 3 / y) / np.pi + 0.5
 
     # Cutoff function parameters
-    M_ring = 0.3 * N_C
-    M_ring[N_C > 40] = 0.4 * N_C[N_C > 40]
+    M_ring = 0.3 * nc
+    M_ring[nc > 40] = 0.4 * nc[nc > 40]
     lamc_neu = 0.951 * u.um / (1.0 + 3.616 / np.sqrt(M_ring))
     lamc_ion = 1.125 * u.um / (1.0 + 2.567 / np.sqrt(M_ring))
 
@@ -121,10 +121,10 @@ def calc_cabs(wavelength_arr, radius_arr):
 
         idx = np.where((10 < x) & (x < 15))
         cabs_ion_out[i, idx] += (
-            (S_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * N_C[i] * (1.0 - xi_gra[i])
+            (S_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
         )
         cabs_neu_out[i, idx] += (
-            (S_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * N_C[i] * (1.0 - xi_gra[i])
+            (S_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
         )
 
         idx = np.where((7.7 < x) & (x <= 10))
@@ -132,14 +132,14 @@ def calc_cabs(wavelength_arr, radius_arr):
             (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
             * 1.0e-18
             * u.cm**2
-            * N_C[i]
+            * nc[i]
             * (1.0 - xi_gra[i])
         )
         cabs_neu_out[i, idx] += (
             (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
             * 1.0e-18
             * u.cm**2
-            * N_C[i]
+            * nc[i]
             * (1.0 - xi_gra[i])
         )
 
@@ -150,41 +150,41 @@ def calc_cabs(wavelength_arr, radius_arr):
         c3 = 4.37e-20 * u.cm**2  # Note Equations A11 and A12 are mislabeled
         cabs_ion_out[i, idx] += (
             (S_mat_ion[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
-            * N_C[i]
+            * nc[i]
             * (1.0 - xi_gra[i])
         )
         cabs_neu_out[i, idx] += (
             (S_mat_neu[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
-            * N_C[i]
+            * nc[i]
             * (1.0 - xi_gra[i])
         )
 
         idx = np.where((3.3 < x) & (x <= 5.9))
-        cabs_ion_out[i, idx] += (S_mat_ion[1, idx] + c0 + c1 * x[idx]) * N_C[i] * (1.0 - xi_gra[i])
-        cabs_neu_out[i, idx] += (S_mat_neu[1, idx] + c0 + c1 * x[idx]) * N_C[i] * (1.0 - xi_gra[i])
+        cabs_ion_out[i, idx] += (S_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+        cabs_neu_out[i, idx] += (S_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
 
         idx = np.where(x <= 3.3)
         cabs_ion_out[i, idx] += (
-            34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_ion[idx] * N_C[i] * (1.0 - xi_gra[i])
+            34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
         )
         cabs_neu_out[i, idx] += (
-            34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_neu[idx] * N_C[i] * (1.0 - xi_gra[i])
+            34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
         )
 
         for j in range(len(lamj_tab)):
             if j > 1:
-                cabs_ion_out[i, idx] += S_mat_ion[j, idx] * N_C[i] * (1.0 - xi_gra[i])
-                cabs_neu_out[i, idx] += S_mat_neu[j, idx] * N_C[i] * (1.0 - xi_gra[i])
+                cabs_ion_out[i, idx] += S_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                cabs_neu_out[i, idx] += S_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
 
         cabs_ion_out[i, idx] += (
-            3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * N_C[i] * (1.0 - xi_gra[i]) * u.cm**2
+            3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i]) * u.cm**2
         )  # Note: does not appear in D21+
 
     return cabs_ion_out, cabs_neu_out
 
 
 def calc_pah_energy(grain_radius, temp_arr):
-    """Calculate PAH vibrational energy as a function of temperature according to Eq. 33 of Draine & Li (2001).
+    """Calculate PAH vibrational energy as a function of temperature.
 
     Parameters
     ----------
@@ -196,7 +196,7 @@ def calc_pah_energy(grain_radius, temp_arr):
     Returns
     -------
     energies : astropy.units.Quantity (array_like)
-        Resulting PAH energy array (in u.ergs)
+        Resulting PAH energy array (in u.erg)
 
     Raises
     ------
@@ -206,34 +206,197 @@ def calc_pah_energy(grain_radius, temp_arr):
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     radius_unit, temp_unit = u.AA, u.K
-
     check_param(grain_radius, radius_unit)
     check_param(temp_arr, temp_unit, iterable=True)
 
     # 5 types of vibration: out-of-plane C-C modes, in-plane C-C modes, out-of-plane C-H bending, in-plane C-H bending, and C-H stretching.
-    N_C = calc_N_C([grain_radius.value] * radius_unit)[0]
-    N_H = calc_N_H(N_C)
-    theta_op = 863 * u.K  # C-C out-of-plane mode Debye temperature
-    theta_ip = 2504 * u.K  # C-C in-plane mode Debye temperature
-    EMCH_OP = 886 * (1 / u.cm)  # cm-1
-    EMCH_IP = 1161 * (1 / u.cm)
-    EMCH_ST = 3030 * (1 / u.cm)
+    nc = calc_nc([grain_radius.value] * radius_unit)[0]  # number of carbon atoms
+    nh = calc_nh(nc)  # number of hydrogen atoms
+    nm_cc_op = nc - 2  # total number of C-C out-of-plane modes
+    nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
 
-    # contributions from C-H in-plane bending, out-of-plane bending, and stretching
-    energy_CH = N_H * (
-        EMCH_IP / (np.expm1(h.cgs * c.cgs * EMCH_IP / (k_B.cgs * temp_arr)) - 1 + 1) * h.cgs * c.cgs
-        + EMCH_OP / (np.expm1(h.cgs * c.cgs * EMCH_OP / (k_B.cgs * temp_arr)) - 1 + 1) * h.cgs * c.cgs
-        + EMCH_ST / (np.expm1(h.cgs * c.cgs * EMCH_ST / (k_B.cgs * temp_arr)) - 1 + 1) * h.cgs * c.cgs
+    theta_op_cc = 863 * u.K  # C-C out-of-plane bending mode Debye temperature
+    theta_ip_cc = 2500 * u.K  # C-C in-plane bending mode Debye temperature
+    theta_op_ch = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
+    theta_ip_ch = 1670 * u.K  # C-H in-plane bending mode Debye temperature
+    theta_str_ch = 4360 * u.K  # C-H stretching mode Debye temperature
+
+    # determines if grain energy will be calculated using Debye spectrum method or discrete mode method
+    nc_cutoff = 7360
+
+    # For grains smaller than size_cutoff, calculate C-C energies using the Debye spectrum approximation
+    # Eq. 33 of Draine & Li (2001)
+    if nc > nc_cutoff:
+        energies = calc_pah_energy_debye(
+            temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
+        )
+
+    # For grains smaller than size_cutoff, calculate energies by summing contributions from individual modes
+    # Eq. 2 of Draine & Li (2001)
+    if nc <= nc_cutoff:
+        energies = calc_pah_energy_modes(
+            temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
+        )
+
+    return energies
+
+
+def calc_pah_energy_debye(
+    temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
+):
+    """Calculate PAH energy using eq. 33 of Draine & Li (2001).
+
+    Parameters
+    ----------
+    temp_arr : astropy.units.Quantity (array-like)
+        Array of temperature to calculate energies for
+    nm_cc_ip : int
+        Number of C-C in-plane stretching modes
+    nm_cc_op : int
+        Number of C-C out-of-plane stretching modes
+    nh : int
+        Number of hydrogen atoms
+    theta_ip_cc : astropy.units.Quantity (float)
+        C-C in-plane bending mode Debye temperature
+    theta_op_cc : astropy.units.Quantity (float)
+        C-C out-of-plane bending mode Debye temperature
+    theta_ip_ch : astropy.units.Quantity (float)
+        C-H in-plane bending mode Debye temperature
+    theta_op_ch : astropy.units.Quantity (float)
+        C-H out-of-plane bending mode Debye temperature
+    theta_str_ch : astropy.units.Quantity (float)
+        C-H stretching mode Debye temperature
+
+    Returns
+    -------
+    energies : astropy.units.Quantity (array_like)
+        Resulting PAH energy array (in u.erg)
+
+    Raises
+    ------
+    AttributeError
+        If the input is not an astropy.units.Quantity object
+    TypeError
+        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+    """
+    check_param(temp_arr, u.K, iterable=True)
+    check_param(theta_ip_cc, u.K)
+    check_param(theta_op_cc, u.K)
+    check_param(theta_ip_ch, u.K)
+    check_param(theta_op_ch, u.K)
+    check_param(theta_str_ch, u.K)
+
+    # contributions from individual C-H modes, as implemented in lines 157-181 of pah_spec_heat.f
+    energy_ch = np.zeros(len(temp_arr)) * u.erg
+
+    x = theta_op_ch / temp_arr
+    y = exp(x)
+    tmin = 32 * u.K
+    energy_ch[temp_arr > tmin] += (
+        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
-    # contributions from C-C modes (Debye spectrum)
-    energy_CC = (
-        (N_C - 2)
-        * k_B.cgs
-        * (theta_op * f2(temp_arr.value / theta_op.value) + 2 * theta_ip * f2(temp_arr.value / theta_ip.value))
+
+    x = theta_ip_ch / temp_arr
+    y = exp(x)
+    tmin = 42 * u.K
+    energy_ch[temp_arr > tmin] += (
+        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
+
+    x = theta_str_ch / temp_arr
+    y = exp(x)
+    tmin = 109 * u.K
+    energy_ch[temp_arr > tmin] += (
+        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
+    )
+
+    # contributions from C-C modes (approximated as Debye spectrum)
+    energy_cc_op = np.zeros(len(temp_arr)) * u.erg
+    energy_cc_op += debye_2(theta_op_cc / temp_arr) * k_B.cgs * temp_arr
+
+    energy_cc_ip = np.zeros(len(temp_arr)) * u.erg
+    energy_cc_ip += debye_2(theta_ip_cc / temp_arr) * k_B.cgs * temp_arr
 
     # total energy
-    energies = energy_CH + energy_CC
+    # energies = energy_ch + (nc - 2) * (energy_cc_op + 2 * energy_cc_ip)
+    energies = energy_ch + nm_cc_op * energy_cc_op + nm_cc_ip * energy_cc_ip
+
+    return energies
+
+
+def calc_pah_energy_modes(
+    temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
+):
+    """Calculate PAH energy using eq. 2 of Draine & Li (2001).
+
+    Parameters
+    ----------
+    temp_arr : astropy.units.Quantity (array-like)
+        Array of temperature to calculate energies for
+    nc : int
+        Number of carbon atoms
+    nh : int
+        Number of hydrogen atoms
+    nm_cc_ip : int
+        Number of C-C in-plane stretching modes
+    nm_cc_op : int
+        Number of C-C out-of-plane stretching modes
+    theta_ip_cc : astropy.units.Quantity (float)
+        C-C in-plane bending mode Debye temperature
+    theta_op_cc : astropy.units.Quantity (float)
+        C-C out-of-plane bending mode Debye temperature
+    theta_ip_ch : astropy.units.Quantity (float)
+        C-H in-plane bending mode Debye temperature
+    theta_op_ch : astropy.units.Quantity (float)
+        C-H out-of-plane bending mode Debye temperature
+    theta_str_ch : astropy.units.Quantity (float)
+        C-H stretching mode Debye temperature
+
+    Returns
+    -------
+    energies : astropy.units.Quantity (array_like)
+        Resulting PAH energy array (in u.erg)
+
+    Raises
+    ------
+    AttributeError
+        If the input is not an astropy.units.Quantity object
+    TypeError
+        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+    """
+    check_param(temp_arr, u.K, iterable=True)
+    check_param(theta_ip_cc, u.K)
+    check_param(theta_op_cc, u.K)
+    check_param(theta_ip_ch, u.K)
+    check_param(theta_op_ch, u.K)
+    check_param(theta_str_ch, u.K)
+
+    modes_cc_op = calc_cc_mode_energies(nc, nm_cc_op, theta_op_cc)
+    modes_cc_ip = calc_cc_mode_energies(nc, nm_cc_ip, theta_ip_cc)
+    modes_ch_op = calc_ch_mode_energies(nh, theta_op_ch)
+    modes_ch_ip = calc_ch_mode_energies(nh, theta_ip_ch)
+    modes_ch_str = calc_ch_mode_energies(nh, theta_str_ch)
+
+    emodes = (
+        sorted(
+            np.concatenate(
+                (modes_cc_op.value, modes_cc_ip.value, modes_ch_op.value, modes_ch_ip.value, modes_ch_str.value)
+            )
+        )
+        * modes_cc_op.unit
+    )
+    nmodes = len(emodes)
+
+    energies = np.zeros(len(temp_arr)) * u.erg
+
+    exp_cutoff = 100  # ignore contributions from exp(x) when x is large
+
+    # emodes array contains mode energies from C-C in-plane and out-of-plane bending and C-H stretching and in-plane
+    # in-plane and out-of-plane bending
+    for j in range(0, nmodes):
+        x = emodes[j] / (k_B.cgs * temp_arr)
+        y = exp(x)
+        energies[x < exp_cutoff] += (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1)) * k_B.cgs * temp_arr[x < exp_cutoff]
 
     return energies
 
@@ -294,7 +457,6 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     dE_max = 0.001
 
     while temp_i.value > 5:
-
         dE_dt = -trapezoid(4 * np.pi * planck_function_nu(nu_arr, temp_i) * cabs_arr, x=nu_arr)
 
         dt = dE_max * energy_i / dE_dt
@@ -435,40 +597,70 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, c_abs_arr, wavelen
 ################# Utility functions #################
 
 
-def calc_N_H(N_C):
+def calc_nh(nc):
     """Eq. 8 of Draine & Li (2001)"""
+    nh = 0
+    if nc <= 25:
+        nh = round(0.5 * nc + 0.5)
+    if (nc > 25) and (nc <= 100):
+        nh = round(2.5 * np.sqrt(nc) + 0.5)
+    if nc > 100:
+        nh = round(0.25 * nc + 0.5)
+    return nh
 
-    N_H = 0
-    if N_C <= 25:
-        N_H = int(0.5 * N_C + 0.5)
-    if (N_C > 25) and (N_C <= 100):
-        N_H = int(2.5 * np.sqrt(N_C) + 0.5)
-    if N_C > 100:
-        N_H = int(0.25 * N_C + 0.5)
-    return N_H
 
-
-def calc_N_C(a):
+def calc_nc(a):
     """Eq. 8 of Draine & Li (2021)"""
-
     check_param(a, u.AA, iterable=True)
-    N_C = 418 * (a / (10 * u.AA)) ** 3
-    return N_C.astype(int)
+    nc = 418 * (a / (10 * u.AA)) ** 3
+    return nc.value.round(0).astype(int)
 
 
-def f2(x):
-    # From Eq. 10 of Draine & Li (2001), note corrected prefactor of f_n(x) = n * (integral)
-    polylog_vectorized = np.frompyfunc(polylog, 2, 1)
+def calc_delta_j(j):
+    """Eq. 6 and 5 of Draine & Li (2001). Adjusts location of first 3 modes to bring agreement with mode spectrum of
+    coronene C_{24}H_{12}.
+    """
+    if (j == 2) or (j == 3):
+        return 1
+    else:
+        return 1 / 2
 
-    polylog_mpf_3 = matrix(polylog_vectorized(3, np.expm1(-1 / x) + 1))
-    polylog_array_3 = np.array(polylog_mpf_3.tolist(), dtype="float64").flatten()
 
-    polylog_mpf_2 = matrix(polylog_vectorized(2, np.expm1(-1 / x) + 1))
-    polylog_array_2 = np.array(polylog_mpf_2.tolist(), dtype="float64").flatten()
+def calc_beta(nc, nm):
+    """Eq. 7 of Draine & Li (2001)"""
+    if nc <= 54:
+        return 0
+    elif (nc > 54) and (nc <= 102):
+        return (1 / (2 * nm - 1)) * ((nc - 54) / 52)
+    elif nc > 102:
+        return (1 / (2 * nm - 1)) * (((nc - 2) / 52) * (102 / nc) ** (2 / 3) - 1)
 
-    return (2 * x) * (
-        log(1 - np.expm1(-1 / x) - 1) - 2 * x * (polylog_array_2 + x * (polylog_array_3 - float(zeta(3))))
-    )
+
+def calc_cc_mode_energies(nc, nm, theta):
+    """As implemented in lines 141-154 and 158-165 of pah_modes.f"""
+    check_param(theta, u.K)
+    mode_energy_arr = np.zeros((nm)) * u.erg
+    beta = calc_beta(nc, nc - 2)  # note that we are intentionally using the same beta for C-C ip and op modes
+
+    for j in range(1, nm + 1):
+        mode_energy_arr[j - 1] = k_B.cgs * theta * np.sqrt((1 - beta) * (j - calc_delta_j(j)) / nm + beta)
+
+    return mode_energy_arr
+
+
+def calc_ch_mode_energies(nh, theta):
+    """As implemented in lines 170-184 of pah_modes.f"""
+    check_param(theta, u.K)
+    mode_energy_arr = np.zeros((nh)) * u.erg
+    mode_energy_arr[:] = k_B.cgs * theta
+
+    return mode_energy_arr
+
+
+def debye_2(x):
+    """As implemented in lines 28-29 of debye.f"""
+    x2 = x * x
+    return (2 / x2) * (2 * 1.20206 - x2 * exp(-x) * (1 + 2 / x + 2 / x2 + exp(-x) * (0.5 + 0.5 / x + 0.25 / x2)))
 
 
 def check_param(param, unit, iterable=False):
@@ -517,3 +709,24 @@ def planck_function_lambd(lambd, T):
     check_param(lambd, u.cm)
     check_param(T, u.K)
     return (2 * h.cgs * c.cgs**2 / lambd**5) * 1 / (np.exp(h.cgs * c.cgs / (lambd * k_B.cgs * T)) - 1)
+
+
+def convert_temp_to_prob(dt_arr, temp_arr, temp_cutoff):
+    dT = abs(np.diff(temp_arr))
+
+    temp_avg = []
+    for i, temp in enumerate(temp_arr):
+        if (i + 1) < len(temp_arr):
+            temp_avg.append((temp_arr[i].value + temp_arr[i + 1].value) / 2)
+
+    temp_avg *= u.K
+
+    temp_avg_sub = temp_avg[temp_avg.value >= temp_cutoff.value]
+    print(temp_avg_sub[0], temp_avg_sub[-1])
+
+    dT_sub = dT[temp_avg.value >= temp_cutoff.value]
+    dt_arr_sub = dt_arr[temp_avg.value >= temp_cutoff.value]
+
+    area = -trapezoid(dt_arr_sub / dT_sub, x=temp_avg_sub)
+
+    return temp_avg_sub, (dt_arr_sub / dT_sub) / area
