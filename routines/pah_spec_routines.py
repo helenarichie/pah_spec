@@ -316,7 +316,6 @@ def calc_pah_energy_debye(
     energy_cc_ip += debye_2(theta_ip_cc / temp_arr) * k_B.cgs * temp_arr
 
     # total energy
-    # energies = energy_ch + (nc - 2) * (energy_cc_op + 2 * energy_cc_ip)
     energies = energy_ch + nm_cc_op * energy_cc_op + nm_cc_ip * energy_cc_ip
 
     return energies
@@ -522,7 +521,7 @@ def calc_eigenvector(wavelength_arr, weighting, temp_arr, c_abs_arr):
     return eigenvector * unit
 
 
-def calc_normalization(lambda_abs, mrf_width, wavelength_arr, c_abs_arr, wavelengths_u, u_lambda, p_lambda):
+def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wavelengths_u, u_lambda, p_lambda):
     """Calculate the energy conservation normalization to scale an eigenvector to an input radiation field.
 
     Parameters
@@ -533,8 +532,8 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, c_abs_arr, wavelen
         Width of the "monochromatic" radiation field, defined as a percentage of lambda_abs
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of emission wavelengths
-    c_abs_arr : astropy.units.Quantity (array_like)
-        Array of length len(wavelength_arr) with C_abs values for a given grain
+    grain_radius : astropy.units.Quantity (float)
+        Dust grain radius
     wavelengths_u : astropy.units.Quantity (array_like)
         Wavelength array for the radiation field u_lambda
     u_lambda : astropy.units.Quantity (array_like)
@@ -562,7 +561,8 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, c_abs_arr, wavelen
     )
     check_param(lambda_abs, wavelength_unit)
     check_param(wavelength_arr, wavelength_unit, iterable=True)
-    check_param(c_abs_arr, c_abs_unit, iterable=True)
+    # check_param(c_abs_arr, c_abs_unit, iterable=True)
+    check_param(grain_radius, u.AA, iterable=True)
     check_param(wavelengths_u, wavelength_unit, iterable=True)
     check_param(u_lambda, radiation_field_unit, iterable=True)
     check_param(p_lambda, eigenvector_unit, iterable=True)
@@ -581,11 +581,11 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, c_abs_arr, wavelen
     wav0, wav1 = lambda_abs, lambda_abs + lambda_abs * mrf_width
     wav_mrf = np.array([wav0.value, wav1.value]) * lambda_abs.unit
 
-    c_abs_mrf = np.interp([wav0, wav1], wavelength_arr, c_abs_arr)
+    c_abs_mrf, _ = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)
 
     u_lambda_mrf = np.interp(wav_mrf, wavelengths_u, u_lambda)
 
-    numerator = trapezoid(u_lambda_mrf * c_abs_mrf * c.cgs, x=wav_mrf.to(u.cm))
+    numerator = trapezoid(u_lambda_mrf * c_abs_mrf[0] * c.cgs, x=wav_mrf.to(u.cm))
 
     denominator = 4 * np.pi * trapezoid(p_lambda, x=wavelength_arr.to(u.cm))
 
@@ -638,7 +638,8 @@ def calc_cc_mode_energies(nc, nm, theta):
     """As implemented in lines 141-154 and 158-165 of pah_modes.f"""
     check_param(theta, u.K)
     mode_energy_arr = np.zeros((nm)) * u.erg
-    beta = calc_beta(nc, nc - 2)  # note that we are intentionally using the same beta for C-C ip and op modes
+    # beta = calc_beta(nc, nc - 2)  # note that we are intentionally using the same beta for C-C ip and op modes
+    beta = calc_beta(nc, nm)  # note that we are intentionally using the same beta for C-C ip and op modes
 
     for j in range(1, nm + 1):
         mode_energy_arr[j - 1] = k_B.cgs * theta * np.sqrt((1 - beta) * (j - calc_delta_j(j)) / nm + beta)
@@ -694,7 +695,7 @@ def check_param(param, unit, iterable=False):
 
     if iterable:
         if not isinstance(param.value, (list, tuple, np.ndarray)):
-            raise TypeError("calc_cabs expects array-like input for wavelength")
+            raise TypeError("expects array-like input")
 
 
 def planck_function_nu(nu, T):
