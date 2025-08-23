@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import sys
 
-sys.path.insert(0, "../routines/")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "../routines/"))
 from pah_spec_routines import check_param, calc_cabs, calc_pah_energy, calc_pah_cooling, calc_eigenvector
 
 
@@ -67,7 +67,7 @@ def generate_basis_vectors(grain_radius, dlambda, lambda_min, lambda_max, emissi
     temp_arr = np.linspace(1, 1e4, 1000) * u.K
     energy_arr = calc_pah_energy(grain_radius[0], temp_arr)
 
-    basis_vectors = np.zeros((len(photon_wavelengths), len(emission_wavelengths)))
+    basis_vectors = np.zeros((len(photon_wavelengths), len(emission_wavelengths))) * u.erg / (u.cm * u.s)
 
     for i, lambda_abs in enumerate(photon_wavelengths):
 
