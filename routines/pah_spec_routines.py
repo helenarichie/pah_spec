@@ -478,8 +478,8 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
-def calc_eigenvector(wavelength_arr, weighting, temp_arr, c_abs_arr):
-    """Calculate the eigenvector for a single-photon absorption.
+def calc_basis_vector(wavelength_arr, weighting, temp_arr, c_abs_arr):
+    """Calculate the basis vector for a single-photon absorption.
 
     Parameters
     ----------
@@ -494,8 +494,8 @@ def calc_eigenvector(wavelength_arr, weighting, temp_arr, c_abs_arr):
 
     Returns
     -------
-    eigenvector : astropy.units.Quantity (array_like)
-        Array of floats of length len(wavelength_arr) with eigenvector for a given grain (in u.erg / (u.cm * u.s))
+    basis_vector : astropy.units.Quantity (array_like)
+        Array of floats of length len(wavelength_arr) with basis vector for a given grain (in u.erg / (u.cm * u.s))
 
     Raises
     ------
@@ -512,17 +512,17 @@ def calc_eigenvector(wavelength_arr, weighting, temp_arr, c_abs_arr):
 
     unit = None
 
-    eigenvector = np.zeros(len(wavelength_arr))
+    basis_vector = np.zeros(len(wavelength_arr))
     for i, lambda_i in enumerate(wavelength_arr.to(u.cm)):
         p_lambda_i = np.sum(4 * np.pi * planck_function_lambd(lambda_i.to(u.cm), temp_arr) * weighting * c_abs_arr[i])
         unit = p_lambda_i.unit
-        eigenvector[i] = p_lambda_i.value
+        basis_vector[i] = p_lambda_i.value
 
-    return eigenvector * unit
+    return basis_vector * unit
 
 
 def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wavelengths_u, u_lambda, p_lambda):
-    """Calculate the energy conservation normalization to scale an eigenvector to an input radiation field.
+    """Calculate the energy conservation normalization to scale a basis vector to an input radiation field.
 
     Parameters
     ----------
@@ -539,7 +539,7 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wave
     u_lambda : astropy.units.Quantity (array_like)
         Array of length len(wavelengths_u) with the radiation field
     p_lambda : astropy.units.Quantity (array_like)
-        Eigenvector array of length len(wavelength_arr) for a given grain and lambda_abs
+        Basis vector array of length len(wavelength_arr) for a given grain and lambda_abs
 
     Returns
     -------
@@ -553,7 +553,7 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wave
     TypeError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    wavelength_unit, c_abs_unit, radiation_field_unit, eigenvector_unit = (
+    wavelength_unit, c_abs_unit, radiation_field_unit, basis_vector_unit = (
         u.um,
         u.cm**2,
         u.erg / (u.cm**4),
@@ -561,33 +561,29 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wave
     )
     check_param(lambda_abs, wavelength_unit)
     check_param(wavelength_arr, wavelength_unit, iterable=True)
-    # check_param(c_abs_arr, c_abs_unit, iterable=True)
     check_param(grain_radius, u.AA, iterable=True)
     check_param(wavelengths_u, wavelength_unit, iterable=True)
     check_param(u_lambda, radiation_field_unit, iterable=True)
-    check_param(p_lambda, eigenvector_unit, iterable=True)
+    check_param(p_lambda, basis_vector_unit, iterable=True)
 
     # TODO: test whether we should use more than two-wavelengths to integrate the MRF
+    # TODO: generalize routine to arbitrary grain ionization
 
-    # define monochromatic radiation field wavlenegth range
-    # wh_wav0, wh_wav1 = np.argmin(np.abs(wavelength_arr - wav0)), np.argmin(np.abs(wavelength_arr - wav1))
-    # if wh_wav0 == wh_wav1:
-    #     raise ValueError(f"emission wavelength binning is too coarse for input mrf_width of {mrf_width}")
-
-    # interpolate radiation field to have the same wavelength resolution as wavelength_arr
-    # also define C_abs array over monochromatic radiation field wavelength range
-    # wav_mrf, c_abs_mrf = wavelength_arr[wh_wav0 : wh_wav1 + 1], c_abs_arr[wh_wav0 : wh_wav1 + 1]
-
+    # define monochromatic radiation field wavelength range
     wav0, wav1 = lambda_abs, lambda_abs + lambda_abs * mrf_width
     wav_mrf = np.array([wav0.value, wav1.value]) * lambda_abs.unit
 
-    c_abs_mrf, _ = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)
+    # get corresponding cross-sections (for ionized grains)
+    c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[0][0]
 
+    # interpolate radiation field to the chosen wavelength range
     u_lambda_mrf = np.interp(wav_mrf, wavelengths_u, u_lambda)
 
+    # integrate to determine the power of the radiation field in this wavelength range
     numerator = trapezoid(u_lambda_mrf * c_abs_mrf[0] * c.cgs, x=wav_mrf.to(u.cm))
 
-    denominator = 4 * np.pi * trapezoid(p_lambda, x=wavelength_arr.to(u.cm))
+    # integrate to determine the power radiated by the grain over all wavelengths
+    denominator = trapezoid(p_lambda, x=wavelength_arr.to(u.cm))
 
     return numerator, denominator
 
