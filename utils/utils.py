@@ -39,6 +39,7 @@ def write_basis_vectors(emission_wavelengths, photon_wavelengths, basis_vectors,
     df = pd.DataFrame(data)
     df.to_csv(os.path.join(data_path, filename), index=False)
 
+
 def generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     check_param(lambda_min, u.um)
     check_param(lambda_max, u.um)
