@@ -23,7 +23,7 @@ def generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     return photon_wavelengths
 
 
-def generate_basis_vectors(grain_radius, dlambda, lambda_min, lambda_max, emission_wavelengths):
+def generate_basis_vectors(grain_radius, dlambda, lambda_min, lambda_max, emission_wavelengths, cabs_arr=None):
     check_param(grain_radius, u.AA)
     check_param(lambda_min, u.um)
     check_param(lambda_max, u.um)
@@ -31,7 +31,8 @@ def generate_basis_vectors(grain_radius, dlambda, lambda_min, lambda_max, emissi
 
     photon_wavelengths = generate_photon_wavelengths(dlambda, lambda_min, lambda_max)
 
-    cabs_arr = calc_cabs(emission_wavelengths, grain_radius)
+    if cabs_arr == None:
+        cabs_arr = calc_cabs(emission_wavelengths, grain_radius)[0][0]
     
     temp_arr = np.linspace(1, 1e4, 1000) * u.K
     energy_arr = calc_pah_energy(grain_radius[0], temp_arr)
@@ -40,16 +41,17 @@ def generate_basis_vectors(grain_radius, dlambda, lambda_min, lambda_max, emissi
 
     for i, lambda_abs in enumerate(photon_wavelengths):
 
-        dt_arr, time_arr, temp_arr_t = calc_pah_cooling(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, cabs_arr[0][0], temp_arr, energy_arr)
+        dt_arr, time_arr, temp_arr_t = calc_pah_cooling(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, cabs_arr, temp_arr, energy_arr)
         temp_arr_t = temp_arr_t[0:-1]  # make array same length as weighting array
         temp_weights = dt_arr / np.sum(dt_arr)
 
-        basis_vectors[i] = calc_basis_vector(emission_wavelengths, temp_weights, temp_arr_t, cabs_arr[0][0])
+        basis_vectors[i] = calc_basis_vector(emission_wavelengths, temp_weights, temp_arr_t, cabs_arr)
 
     return emission_wavelengths, photon_wavelengths, basis_vectors
 
 
 def write_basis_vectors(emission_wavelengths, photon_wavelengths, basis_vectors, data_path, filename):
+    # TODO: enforce naming style for basis vector file
     check_param(emission_wavelengths, u.um, iterable=True)
     check_param(photon_wavelengths, u.um, iterable=True)
     check_param(basis_vectors, u.erg / (u.cm * u.s), iterable=True)
