@@ -37,14 +37,17 @@ def calc_cabs(wavelength_arr, radius_arr):
 
     # ensure that wavelength and grain radius variables are array-like with correct units
     check_param(wavelength_arr, wavelength_unit, iterable=True)
-    check_param(radius_arr, radius_unit, iterable=True)
+    check_param(radius_arr, radius_unit)
+
+    if not isinstance(radius_arr.value, (list, tuple, np.ndarray)):
+        radius_arr = np.array([radius_arr.value]) * radius_arr.unit
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(script_directory, "../data/")
 
     if not os.path.exists(data_path):
         raise FileNotFoundError(
-            f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {data_path}, but the path does not exist"
+            f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {data_path}, but the file does not exist"
         )
 
     (wav_graphite, qabs) = np.genfromtxt(os.path.join(data_path, "qabs_001um.dat"), unpack=True, usecols=[0, 2])
