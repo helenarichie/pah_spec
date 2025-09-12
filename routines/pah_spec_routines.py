@@ -196,7 +196,7 @@ def calc_pah_energy(grain_radius, temp_arr):
 
     Returns
     -------
-    energies : astropy.units.Quantity (array_like)
+    energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
 
     Raises
@@ -228,18 +228,18 @@ def calc_pah_energy(grain_radius, temp_arr):
     # For grains smaller than size_cutoff, calculate C-C energies using the Debye spectrum approximation
     # Eq. 33 of Draine & Li (2001)
     if nc > nc_cutoff:
-        energies = calc_pah_energy_debye(
+        energy_arr = calc_pah_energy_debye(
             temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
         )
 
     # For grains smaller than size_cutoff, calculate energies by summing contributions from individual modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
-        energies = calc_pah_energy_modes(
+        energy_arr = calc_pah_energy_modes(
             temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
         )
 
-    return energies
+    return energy_arr
 
 
 def calc_pah_energy_debye(
@@ -270,7 +270,7 @@ def calc_pah_energy_debye(
 
     Returns
     -------
-    energies : astropy.units.Quantity (array_like)
+    energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
 
     Raises
@@ -319,9 +319,9 @@ def calc_pah_energy_debye(
     energy_cc_ip += debye_2(theta_ip_cc / temp_arr) * k_B.cgs * temp_arr
 
     # total energy
-    energies = energy_ch + nm_cc_op * energy_cc_op + nm_cc_ip * energy_cc_ip
+    energy_arr = energy_ch + nm_cc_op * energy_cc_op + nm_cc_ip * energy_cc_ip
 
-    return energies
+    return energy_arr
 
 
 def calc_pah_energy_modes(
@@ -354,7 +354,7 @@ def calc_pah_energy_modes(
 
     Returns
     -------
-    energies : astropy.units.Quantity (array_like)
+    energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
 
     Raises
@@ -371,37 +371,37 @@ def calc_pah_energy_modes(
     check_param(theta_op_ch, u.K)
     check_param(theta_str_ch, u.K)
 
-    modes_cc_op = calc_cc_mode_energies(nc, nm_cc_op, theta_op_cc)
-    modes_cc_ip = calc_cc_mode_energies(nc, nm_cc_ip, theta_ip_cc)
-    modes_ch_op = calc_ch_mode_energies(nh, theta_op_ch)
-    modes_ch_ip = calc_ch_mode_energies(nh, theta_ip_ch)
-    modes_ch_str = calc_ch_mode_energies(nh, theta_str_ch)
+    mode_arr_cc_op = calc_cc_mode_energies(nc, nm_cc_op, theta_op_cc)
+    mode_arr_cc_ip = calc_cc_mode_energies(nc, nm_cc_ip, theta_ip_cc)
+    mode_arr_ch_op = calc_ch_mode_energies(nh, theta_op_ch)
+    mode_arr_ch_ip = calc_ch_mode_energies(nh, theta_ip_ch)
+    mode_arr_ch_str = calc_ch_mode_energies(nh, theta_str_ch)
 
-    emodes = (
+    emode_arr = (
         sorted(
             np.concatenate(
-                (modes_cc_op.value, modes_cc_ip.value, modes_ch_op.value, modes_ch_ip.value, modes_ch_str.value)
+                (mode_arr_cc_op.value, mode_arr_cc_ip.value, mode_arr_ch_op.value, mode_arr_ch_ip.value, mode_arr_ch_str.value)
             )
         )
-        * modes_cc_op.unit
+        * mode_arr_cc_op.unit
     )
-    nmodes = len(emodes)
+    nmodes = len(emode_arr)
 
-    energies = np.zeros(len(temp_arr)) * u.erg
+    energy_arr = np.zeros(len(temp_arr)) * u.erg
 
     exp_cutoff = 100  # ignore contributions from exp(x) when x is large
 
     # emodes array contains mode energies from C-C in-plane and out-of-plane bending and C-H stretching and in-plane
     # in-plane and out-of-plane bending
     for j in range(0, nmodes):
-        x = emodes[j] / (k_B.cgs * temp_arr)
+        x = emode_arr[j] / (k_B.cgs * temp_arr)
         y = exp(x)
-        energies[x < exp_cutoff] += (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1)) * k_B.cgs * temp_arr[x < exp_cutoff]
+        energy_arr[x < exp_cutoff] += (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1)) * k_B.cgs * temp_arr[x < exp_cutoff]
 
-    return energies
+    return energy_arr
 
 
-def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_arr, energy_arr):
+def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
     """Calculate the temperature evolution of a PAH following a single-photon absorption.
 
     Parameters
@@ -439,7 +439,7 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     check_param(lambda_abs, wavelength_unit)
     check_param(grain_radius, radius_unit)
     check_param(wavelength_arr, wavelength_unit, iterable=True)
-    check_param(cabs_arr, c_abs_unit, iterable=True)
+    check_param(c_abs_arr, c_abs_unit, iterable=True)
     check_param(energy_arr, energy_unit, iterable=True)
     check_param(temp_arr, temp_unit, iterable=True)
 
@@ -457,7 +457,7 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     dE_max = 0.001
 
     while temp_i.value > 5:
-        dE_dt = -trapezoid(4 * np.pi * planck_function_nu(nu_arr, temp_i) * cabs_arr, x=nu_arr)
+        dE_dt = -trapezoid(4 * np.pi * planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
 
         dt = dE_max * energy_i / dE_dt
         dE = dE_dt * dt
@@ -481,14 +481,14 @@ def calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, cabs_arr, temp_ar
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
-def calc_basis_vector(wavelength_arr, weighting, temp_arr, c_abs_arr):
+def calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
     """Calculate the basis vector for a single-photon absorption.
 
     Parameters
     ----------
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of emission wavelengths
-    weighting : array_like
+    weighting_arr : array_like
         Array of length len(temp_arr) with values to weight temperatures by
     temp_arr : astropy.units.Quantity (array_like)
         Array with grain temperatures
