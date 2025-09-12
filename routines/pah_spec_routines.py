@@ -14,8 +14,8 @@ def calc_cabs(wavelength_arr, radius_arr):
     ----------
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of wavelengths to calculate C_abs for
-    radius_arr : astropy.units.Quantity (array_like)
-        Array of dust grain radii to calculate C_abs for
+    radius_arr : astropy.units.Quantity (float or array_like)
+        Array of dust grain radii to calculate C_abs for (gets converted to array_like if passed as float)
 
     Returns
     -------
