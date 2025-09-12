@@ -511,38 +511,42 @@ def calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
     check_param(wavelength_arr, wavelength_unit, iterable=True)
     check_param(temp_arr, temp_unit, iterable=True)
     check_param(c_abs_arr, c_abs_unit, iterable=True)
-    # TODO: add check that weighting array is dimensionless
+    check_param(weighting_arr, u.dimensionless_unscaled)
 
     unit = None
 
     basis_vector = np.zeros(len(wavelength_arr))
     for i, lambda_i in enumerate(wavelength_arr.to(u.cm)):
-        p_lambda_i = np.sum(4 * np.pi * planck_function_lambd(lambda_i.to(u.cm), temp_arr) * weighting * c_abs_arr[i])
+        p_lambda_i = np.sum(4 * np.pi * planck_function_lambd(lambda_i.to(u.cm), temp_arr) * weighting_arr * c_abs_arr[i])
         unit = p_lambda_i.unit
         basis_vector[i] = p_lambda_i.value
 
     return basis_vector * unit
 
 
-def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wavelengths_u, u_lambda, p_lambda):
+def calc_normalization(lambda_abs, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
     """Calculate the energy conservation normalization to scale a basis vector to an input radiation field.
 
     Parameters
     ----------
     lambda_abs : astropy.units.Quantity (float)
         Wavelength of absorbed photon
-    mrf_width : float
+    lambda_abs : astropy.units.Quantity (float)
+        Wavelength of absorbed photon
+    dlambda : float
         Width of the "monochromatic" radiation field, defined as a percentage of lambda_abs
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of emission wavelengths
     grain_radius : astropy.units.Quantity (float)
         Dust grain radius
-    wavelengths_u : astropy.units.Quantity (array_like)
+    wavelength_arr_u : astropy.units.Quantity (array_like)
         Wavelength array for the radiation field u_lambda
-    u_lambda : astropy.units.Quantity (array_like)
+    u_lambda_arr : astropy.units.Quantity (array_like)
         Array of length len(wavelengths_u) with the radiation field
-    p_lambda : astropy.units.Quantity (array_like)
+    p_lambda_arr : astropy.units.Quantity (array_like)
         Basis vector array of length len(wavelength_arr) for a given grain and lambda_abs
+    ion : bool
+        Specifies whether or not the PAH is ionized, used to calculate the cross-section
 
     Returns
     -------
@@ -556,39 +560,40 @@ def calc_normalization(lambda_abs, mrf_width, wavelength_arr, grain_radius, wave
     TypeError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    wavelength_unit, c_abs_unit, radiation_field_unit, basis_vector_unit = (
+    wavelength_unit, radiation_field_unit, basis_vector_unit = (
         u.um,
-        u.cm**2,
         u.erg / (u.cm**4),
         u.erg / (u.cm * u.s),
     )
     check_param(lambda_abs, wavelength_unit)
     check_param(wavelength_arr, wavelength_unit, iterable=True)
-    check_param(grain_radius, u.AA, iterable=True)
-    check_param(wavelengths_u, wavelength_unit, iterable=True)
-    check_param(u_lambda, radiation_field_unit, iterable=True)
-    check_param(p_lambda, basis_vector_unit, iterable=True)
+    check_param(grain_radius, u.AA)
+    check_param(wavelength_arr_u, wavelength_unit, iterable=True)
+    check_param(u_lambda_arr, radiation_field_unit, iterable=True)
+    check_param(p_lambda_arr, basis_vector_unit, iterable=True)
 
     # TODO: test whether we should use more than two-wavelengths to integrate the MRF
-    # TODO: generalize routine to arbitrary grain ionization
 
-    # define monochromatic radiation field wavelength range
-    wav0, wav1 = lambda_abs, lambda_abs + lambda_abs * mrf_width
+    # define monochromatic radiation field (MRF) wavelength range
+    wav0, wav1 = lambda_abs, lambda_abs + lambda_abs * dlambda
     wav_mrf = np.array([wav0.value, wav1.value]) * lambda_abs.unit
 
-    # get corresponding cross-sections (for ionized grains)
-    c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[0][0]
+    # get corresponding cross-sections
+    if ion:
+        c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[0][0]
+    else:
+        c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[1][0]
 
     # interpolate radiation field to the chosen wavelength range
-    u_lambda_mrf = np.interp(wav_mrf, wavelengths_u, u_lambda)
+    u_lambda_mrf = np.interp(wav_mrf, wavelength_arr_u, u_lambda_arr)
 
     # integrate to determine the power of the radiation field in this wavelength range
     numerator = trapezoid(u_lambda_mrf * c_abs_mrf[0] * c.cgs, x=wav_mrf.to(u.cm))
 
     # integrate to determine the power radiated by the grain over all wavelengths
-    denominator = trapezoid(p_lambda, x=wavelength_arr.to(u.cm))
+    denominator = trapezoid(p_lambda_arr, x=wavelength_arr.to(u.cm))
 
-    return numerator, denominator
+    return numerator / denominator
 
 
 ################# Utility functions #################
