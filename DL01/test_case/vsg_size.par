@@ -1,6 +1,0 @@
-'graD16emtPAHib' = COMPOSITION (A14)
-24         = ICASE
-0         = ISHAP
-1        = NSIZE = number of sizes (default = 167)
-5.000d-8 = AMIN (cm) [NC=460*(a/1.e-7)**3]
-100.7d-8 = AMAX (cm)
