@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "../routines/"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__))))
 from pah_spec_routines import check_param, calc_cabs, calc_pah_energy, calc_pah_cooling, calc_basis_vector
 
 
