@@ -6,7 +6,7 @@ import os
 from scipy.integrate import trapezoid
 
 
-def calc_cabs(wavelength_arr, radius_arr):
+def calc_c_abs(wavelength_arr, radius_arr):
     """Calculate the absorption cross-section, C_abs, for input grain sizes and wavelengths based on method from
     Draine et al. (2021).
 
@@ -15,13 +15,13 @@ def calc_cabs(wavelength_arr, radius_arr):
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of wavelengths to calculate C_abs for
     radius_arr : astropy.units.Quantity (float or array_like)
-        Array of dust grain radii to calculate C_abs for (gets converted to array_like if passed as float)
+        Array of dust grain radii to calculate C_abs for
 
     Returns
     -------
-    cabs_ion_out : astropy.units.Quantity (array_like)
+    c_abs_ion_out : astropy.units.Quantity (array_like)
         Array with C_abs values for ionized grains (in u.cm ** 2)
-    cabs_neu_out : astropy.units.Quantity (array_like)
+    c_abs_neu_out : astropy.units.Quantity (array_like)
         Array with C_abs values for neutral grains (in u.cm ** 2)
 
     Raises
@@ -94,14 +94,14 @@ def calc_cabs(wavelength_arr, radius_arr):
     lamc_ion = 1.125 * u.um / (1.0 + 2.567 / np.sqrt(M_ring))
 
     x = (1.0 * u.um / wavelength_arr.to(u.um)).value
-    cabs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
-    cabs_neu_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
+    c_abs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
+    c_abs_neu_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
 
     for i, _ in enumerate(radius_arr):
         # Graphite contribtuion
         volume = (4.0 / 3.0) * np.pi * radius_arr[i] ** 3
-        cabs_ion_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
-        cabs_neu_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
+        c_abs_ion_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
+        c_abs_neu_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
 
         # PAH contribution
         C_fac_neu = C_func(
@@ -121,22 +121,22 @@ def calc_cabs(wavelength_arr, radius_arr):
                 S_mat_ion[j, :] = S_func(wavelength_arr.to(u.um), lamj_tab[j], gamj_tab[j], sigj_ion_tab[j] * HC[i])
 
         idx = np.where((10 < x) & (x < 15))
-        cabs_ion_out[i, idx] += (
+        c_abs_ion_out[i, idx] += (
             (S_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
         )
-        cabs_neu_out[i, idx] += (
+        c_abs_neu_out[i, idx] += (
             (S_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
         )
 
         idx = np.where((7.7 < x) & (x <= 10))
-        cabs_ion_out[i, idx] += (
+        c_abs_ion_out[i, idx] += (
             (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
             * 1.0e-18
             * u.cm**2
             * nc[i]
             * (1.0 - xi_gra[i])
         )
-        cabs_neu_out[i, idx] += (
+        c_abs_neu_out[i, idx] += (
             (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
             * 1.0e-18
             * u.cm**2
@@ -149,39 +149,39 @@ def calc_cabs(wavelength_arr, radius_arr):
         c1 = 1.905e-19 * u.cm**2
         c2 = 4.175e-19 * u.cm**2
         c3 = 4.37e-20 * u.cm**2  # Note Equations A11 and A12 are mislabeled
-        cabs_ion_out[i, idx] += (
+        c_abs_ion_out[i, idx] += (
             (S_mat_ion[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
             * nc[i]
             * (1.0 - xi_gra[i])
         )
-        cabs_neu_out[i, idx] += (
+        c_abs_neu_out[i, idx] += (
             (S_mat_neu[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
             * nc[i]
             * (1.0 - xi_gra[i])
         )
 
         idx = np.where((3.3 < x) & (x <= 5.9))
-        cabs_ion_out[i, idx] += (S_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
-        cabs_neu_out[i, idx] += (S_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+        c_abs_ion_out[i, idx] += (S_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+        c_abs_neu_out[i, idx] += (S_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
 
         idx = np.where(x <= 3.3)
-        cabs_ion_out[i, idx] += (
+        c_abs_ion_out[i, idx] += (
             34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
         )
-        cabs_neu_out[i, idx] += (
+        c_abs_neu_out[i, idx] += (
             34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
         )
 
         for j in range(len(lamj_tab)):
             if j > 1:
-                cabs_ion_out[i, idx] += S_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
-                cabs_neu_out[i, idx] += S_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                c_abs_ion_out[i, idx] += S_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                c_abs_neu_out[i, idx] += S_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
 
-        cabs_ion_out[i, idx] += (
+        c_abs_ion_out[i, idx] += (
             3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i]) * u.cm**2
         )  # Note: does not appear in D21+
 
-    return cabs_ion_out, cabs_neu_out
+    return c_abs_ion_out, c_abs_neu_out
 
 
 def calc_pah_energy(grain_radius, temp_arr):
