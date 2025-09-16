@@ -226,14 +226,14 @@ def calc_pah_energy(grain_radius, temp_arr):
     # determines if grain energy will be calculated using Debye spectrum method or discrete mode method
     nc_cutoff = 7360
 
-    # For grains smaller than size_cutoff, calculate C-C energies using the Debye spectrum approximation
+    # For grains with more carbon atoms than nc_cutoff, calculate C-C energies using the Debye spectrum approximation
     # Eq. 33 of Draine & Li (2001)
     if nc > nc_cutoff:
         energy_arr = calc_pah_energy_debye(
             temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
         )
 
-    # For grains smaller than size_cutoff, calculate energies by summing contributions from individual modes
+    # For grains with fewer carbon atoms than nc_cutoff, calculate energies by summing contributions from individual modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
         energy_arr = calc_pah_energy_modes(
