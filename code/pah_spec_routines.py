@@ -525,15 +525,13 @@ def calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
     return basis_vector * unit
 
 
-def calc_normalization(lambda_abs, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
-    """Calculate the energy conservation normalization to scale a basis vector to an input radiation field.
+def scale_basis_spectra(photon_wavelength_arr, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
+    """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
 
     Parameters
     ----------
-    lambda_abs : astropy.units.Quantity (float)
-        Wavelength of absorbed photon
-    lambda_abs : astropy.units.Quantity (float)
-        Wavelength of absorbed photon
+    photon_wavelength_arr : astropy.units.Quantity (array_like)
+        Array of absorbed photon wavelengths
     dlambda : float
         Width of the "monochromatic" radiation field, defined as a percentage of lambda_abs
     wavelength_arr : astropy.units.Quantity (array_like)
@@ -545,14 +543,14 @@ def calc_normalization(lambda_abs, dlambda, wavelength_arr, grain_radius, wavele
     u_lambda_arr : astropy.units.Quantity (array_like)
         Array of length len(wavelengths_u) with the radiation field
     p_lambda_arr : astropy.units.Quantity (array_like)
-        Basis vector array of length len(wavelength_arr) for a given grain and lambda_abs
+        Basis vector array of size (len(photon_wavelength_arr), len(wavelength_arr)) for a given grain
     ion : bool
         Specifies whether or not the PAH is ionized, used to calculate the cross-section
 
     Returns
     -------
-    normalization : float
-        Incident photon power / grain's radiated power (dimensionless)
+    integrated_spectrum : astropy.units.Quantity (array_like)
+        Integrated spectrum for the input grain and radiation field (in units of u.erg / (u.cm * u.s) with length len(wavelength_arr))
 
     Raises
     ------
