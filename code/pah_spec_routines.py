@@ -211,11 +211,12 @@ def calc_pah_energy(grain_radius, temp_arr):
     check_param(temp_arr, temp_unit, iterable=True)
 
     # 5 types of vibration: out-of-plane C-C modes, in-plane C-C modes, out-of-plane C-H bending, in-plane C-H bending, and C-H stretching.
-    nc = calc_nc([grain_radius.value] * radius_unit)[0]  # number of carbon atoms
+    nc = calc_nc(grain_radius)  # number of carbon atoms
     nh = calc_nh(nc)  # number of hydrogen atoms
     nm_cc_op = nc - 2  # total number of C-C out-of-plane modes
     nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
 
+    # TODO: consider moving out of function and naming as constants _THETA_OP_CC
     theta_op_cc = 863 * u.K  # C-C out-of-plane bending mode Debye temperature
     theta_ip_cc = 2500 * u.K  # C-C in-plane bending mode Debye temperature
     theta_op_ch = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
@@ -560,60 +561,71 @@ def calc_normalization(lambda_abs, dlambda, wavelength_arr, grain_radius, wavele
     TypeError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    wavelength_unit, radiation_field_unit, basis_vector_unit = (
-        u.um,
-        u.erg / (u.cm**4),
-        u.erg / (u.cm * u.s),
-    )
-    check_param(lambda_abs, wavelength_unit)
+    wavelength_unit = u.um
+    radiation_field_unit = u.erg / (u.cm**4)
+    basis_vector_unit = u.erg / (u.cm * u.s)
+    check_param(photon_wavelength_arr, wavelength_unit, iterable=True)
+    check_param(photon_wavelength_arr, wavelength_unit, iterable=True) 
     check_param(wavelength_arr, wavelength_unit, iterable=True)
     check_param(grain_radius, u.AA)
     check_param(wavelength_arr_u, wavelength_unit, iterable=True)
     check_param(u_lambda_arr, radiation_field_unit, iterable=True)
     check_param(p_lambda_arr, basis_vector_unit, iterable=True)
 
-    # TODO: test whether we should use more than two-wavelengths to integrate the MRF
-
-    # define monochromatic radiation field (MRF) wavelength range
-    wav0, wav1 = lambda_abs, lambda_abs + lambda_abs * dlambda
-    wav_mrf = np.array([wav0.value, wav1.value]) * lambda_abs.unit
-
-    # get corresponding cross-sections
+    # call calc_c_abs once for all wavelength values needed by calc_normalization
+    lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
     if ion:
-        c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[0][0]
+        c_abs_arr_u = calc_c_abs(wavelength_arr_u, grain_radius)[0][0]
+        c_abs_phot_arr = calc_c_abs(photon_wavelength_arr, grain_radius)[0][0]
+        c_abs_phot_arr = np.insert(c_abs_phot_arr, len(c_abs_phot_arr), calc_c_abs(lambda1_max, grain_radius)[0][0])
     else:
-        c_abs_mrf = calc_cabs([wav0.to(u.um).value, wav1.to(u.um).value] * wav0.to(u.um).unit, grain_radius)[1][0]
+        c_abs_arr_u = calc_c_abs(wavelength_arr_u, grain_radius)[1][0]
+        c_abs_phot_arr = calc_c_abs(photon_wavelength_arr, grain_radius)[1][0] 
+        c_abs_phot_arr = np.insert(c_abs_phot_arr, len(c_abs_phot_arr), calc_c_abs(lambda1_max, grain_radius)[1][0])
 
-    # interpolate radiation field to the chosen wavelength range
-    u_lambda_mrf = np.interp(wav_mrf, wavelength_arr_u, u_lambda_arr)
+    normalizations = np.zeros(len(photon_wavelength_arr))
 
-    # integrate to determine the power of the radiation field in this wavelength range
-    numerator = trapezoid(u_lambda_mrf * c_abs_mrf[0] * c.cgs, x=wav_mrf.to(u.cm))
+    for i, lambda_abs in enumerate(photon_wavelength_arr):
+        # define wavelengths of monochromatic radiation field (MRF)
+        lambda0, lambda1 = lambda_abs, lambda_abs + lambda_abs * dlambda
+        wh_mrf = np.where(np.logical_and(wavelength_arr_u > lambda0, wavelength_arr_u < lambda1))
+        wavelength_arr_mrf = wavelength_arr_u[wh_mrf]
+        wavelength_arr_mrf = np.insert(wavelength_arr_mrf, [0, len(wavelength_arr_mrf)], [lambda0, lambda1])
 
-    # integrate to determine the power radiated by the grain over all wavelengths
-    denominator = trapezoid(p_lambda_arr, x=wavelength_arr.to(u.cm))
+        # get cross-section values of MRF
+        c_abs_arr_mrf = c_abs_arr_u[wh_mrf]
+        wh0, wh1 = np.argmin(np.abs(lambda0 - photon_wavelength_arr)), np.argmin(np.abs(lambda1 - photon_wavelength_arr))
+        c_abs_arr_mrf = np.insert(c_abs_arr_mrf, [0, len(c_abs_arr_mrf)], [c_abs_phot_arr[wh0], c_abs_phot_arr[wh1]])
 
-    return numerator / denominator
+        # interpolate radiation field to the MRF wavelength range
+        u_lambda_arr_mrf = np.interp(wavelength_arr_mrf, wavelength_arr_u, u_lambda_arr)
+
+        # integrate to determine the power of the radiation field in this wavelength range
+        numerator = trapezoid(u_lambda_arr_mrf * c_abs_arr_mrf * c.cgs, x=wavelength_arr_mrf.to(u.cm))
+
+        # integrate to determine the power radiated by the grain over all wavelengths
+        denominator = trapezoid(p_lambda_arr[i], x=wavelength_arr.to(u.cm))
+
+        normalizations[i] = numerator / denominator
+
+    return np.sum(p_lambda_arr * normalizations[:, np.newaxis], axis=0)
 
 
 ################# Utility functions #################
 
-
 def calc_nh(nc):
     """Eq. 8 of Draine & Li (2001)"""
-    nh = 0
     if nc <= 25:
-        nh = round(0.5 * nc + 0.5)
+        return round(0.5 * nc + 0.5)
     if (nc > 25) and (nc <= 100):
-        nh = round(2.5 * np.sqrt(nc) + 0.5)
+        return round(2.5 * np.sqrt(nc) + 0.5)
     if nc > 100:
-        nh = round(0.25 * nc + 0.5)
-    return nh
+        return round(0.25 * nc + 0.5)
 
 
 def calc_nc(a):
     """Eq. 8 of Draine & Li (2021)"""
-    check_param(a, u.AA, iterable=True)
+    check_param(a, u.AA)
     nc = 418 * (a / (10 * u.AA)) ** 3
     return nc.value.round(0).astype(int)
 
