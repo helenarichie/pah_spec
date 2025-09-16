@@ -36,8 +36,8 @@ def calc_c_abs(wavelength_arr, radius_arr):
     wavelength_unit, radius_unit = u.um, u.AA
 
     # ensure that wavelength and grain radius variables are array-like with correct units
-    check_param(wavelength_arr, wavelength_unit, iterable=True)
-    check_param(radius_arr, radius_unit)
+    wavelength_arr = check_param(wavelength_arr, wavelength_unit, force_iterable=True)
+    radius_arr = check_param(radius_arr, radius_unit, force_iterable=True)
 
     if not isinstance(radius_arr.value, (list, tuple, np.ndarray)):
         radius_arr = np.array([radius_arr.value]) * radius_arr.unit
@@ -666,7 +666,7 @@ def debye_2(x):
     return (2 / x2) * (2 * 1.20206 - x2 * exp(-x) * (1 + 2 / x + 2 / x2 + exp(-x) * (0.5 + 0.5 / x + 0.25 / x2)))
 
 
-def check_param(param, unit, iterable=False):
+def check_param(param, unit, iterable=False, force_iterable=False):
     """Check that input parameters have the correct units (and optionally check if they are array-like).
 
     Parameters
@@ -700,6 +700,11 @@ def check_param(param, unit, iterable=False):
     if iterable:
         if not isinstance(param.value, (list, tuple, np.ndarray)):
             raise TypeError("expects array-like input")
+    
+    if force_iterable:
+        if not isinstance(param.value, (list, tuple, np.ndarray)):
+            param = np.array([param.value]) * param.unit
+        return param
 
 
 def planck_function_nu(nu, T):
