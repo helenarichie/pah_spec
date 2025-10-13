@@ -51,20 +51,20 @@ class PahSpec:
         Parameters
         ----------
         wavelength_arr : astropy.units.Quantity (array_like)
-            Wavelength array for the radiation field u_lambda in u.um
+            Wavelength array for the radiation field u_lambda (in u.um)
         u_lambda_arr : astropy.units.Quantity (array_like)
-            Array of length len(wavelength_arr) with the radiation field in u.erg / u.cm ** 4
+            Array of length len(wavelength_arr) with the radiation field (in u.erg / u.cm ** 4)
         size_dist_neu : array_like
-            Neutral PAH size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+            PAH0 size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
         size_dist_ion : array_like
-            Ionized PAH size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+            PAH+ size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
 
         Returns
         -------
         spectrum_neu : astropy.units.Quantity (array_like)
-            Size- and ionization-integrated spectrum for neutral PAHs heated by the input u_lambda in u.erg / (u.cm * u.s)
+            PAH0 size- and ionization-integrated spectrum for grains heated by the input u_lambda (in u.erg / (u.cm * u.s))
         spectrum_ion : astropy.units.Quantity (array_like)
-            Size- and ionization-integrated spectrum for neutral PAHs heated by the input u_lambda in u.erg / (u.cm * u.s)
+            PAH+ size- and ionization-integrated spectrum for grains heated by the input u_lambda (in u.erg / (u.cm * u.s))
 
         Raises
         ------
