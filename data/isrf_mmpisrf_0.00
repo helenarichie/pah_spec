@@ -1,4 +1,10 @@
- (wav)     (spec)
+ MMP83 spec, log(U)=  0.000   
+ 1.000E+00 = U (heating rate factor)
+ 1.460E-12 = u( h nu < 13.6eV) (erg cm-3)
+ 1.043E-12 = u_starlight( h nu < 13.6eV) (erg cm-3)
+ 2.389E-03 = <h nu> (eV)
+ lambda lambda*u_lambda
+   (um)    (erg cm-3)
  9.120E-02 3.277E-14
  9.162E-02 3.344E-14
  9.203E-02 3.412E-14
