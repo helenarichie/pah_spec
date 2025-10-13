@@ -1,10 +1,12 @@
 from astropy.constants import c, h, k_B
+from astropy.io import fits
 import astropy.units as u
 import numpy as np
 from numpy import exp
 import os
 import pandas as pd
 from scipy.integrate import trapezoid
+from scipy import interpolate
 
 
 GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04, 4.7315e-04, 5.0119e-04, 5.3088e-04,
@@ -44,6 +46,12 @@ class PahSpec:
         self.sigj_neu_tab *= u.cm
         self.sigj_ion_tab *= u.cm
 
+        hdul = fits.open('../data/c_abs_data/graphite_cabs.fits')
+        rad_graphite = hdul[1].data*u.um
+        wav_graphite = hdul[2].data*u.um
+        cabs_graphite = hdul[3].data*u.cm**2
+
+        self.cabs_graphite_spl = interpolate.RectBivariateSpline(rad_graphite.value, wav_graphite.value, cabs_graphite.value)
 
     def generate_spectrum(self, wavelength_arr, u_lambda_arr, size_dist_neu, size_dist_ion):
         """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
@@ -170,135 +178,90 @@ class PahSpec:
         FileNotFoundError
             If the directory data_path does not exist
         """
+
         wavelength_unit, radius_unit = u.um, u.AA
 
         # ensure that wavelength and grain radius variables are array-like with correct units
         wavelength_arr = _check_param(wavelength_arr, wavelength_unit, force_iterable=True)
         radius_arr = _check_param(radius_arr, radius_unit, force_iterable=True)
 
-        if not isinstance(radius_arr.value, (list, tuple, np.ndarray)):
-            radius_arr = np.array([radius_arr.value]) * radius_arr.unit
-
-        # C_abs per volume doesn't depend on size in the small-grain limit
-        cabs_V_graphite = 3.0 * self.qabs / (4 * 1.0e-3 * u.um)
-        cabs_V_graphite_out = np.interp(
-            wavelength_arr.to(u.um),
-            self.wav_graphite[::-1].to(u.um),
-            cabs_V_graphite[::-1].to(u.cm**-1),
-        )
-
-        rho_C = 2.0 * u.g / u.cm**3
-        nc = _calc_nc(radius_arr)  # number of Carbon atoms, Draine 2021
-        HC = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07
-        HC[(nc >= 25) & (nc <= 100)] = 0.5 * np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
+        nc = _calc_nc(radius_arr)
+        HC = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07 # Note that this is from Equation 4 of DL07
+        HC[(nc >= 25) & (nc <= 100)] = 0.5*np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
         HC[nc > 100] = 0.25
         xi_gra = np.zeros_like(radius_arr.value)
         xi_gra[radius_arr < 50 * u.AA] = 0.01
-        xi_gra[radius_arr >= 50 * u.AA] = 0.01 + 0.99 * (1.0 - (50 * u.AA / radius_arr[radius_arr >= 50 * u.AA]) ** 3)
+        xi_gra[radius_arr >= 50 * u.AA] = 0.01 + 0.99 * (1. - (50 * u.AA / radius_arr[radius_arr >= 50 * u.AA]) ** 3)
 
         def S_func(lam, lamj, gamma, sigma):
-            num = 2 * gamma * lamj * sigma
-            denom = np.pi * (((lam / lamj) - (lamj / lam)) ** 2 + gamma**2)
-            return num / denom
-
+            num = 2*gamma*lamj*sigma
+            denom = np.pi*( ((lam/lamj) - (lamj/lam))**2 + gamma**2)
+            return num/denom
+        
         def C_func(y):
-            return np.arctan(1.0e3 * (y - 1.0) ** 3 / y) / np.pi + 0.5
-
+            return np.arctan(1.e3*(y-1.)**3/y)/np.pi + 0.5
+        
         # Cutoff function parameters
         M_ring = 0.3 * nc
         M_ring[nc > 40] = 0.4 * nc[nc > 40]
-        lamc_neu = 0.951 * u.um / (1.0 + 3.616 / np.sqrt(M_ring))
-        lamc_ion = 1.125 * u.um / (1.0 + 2.567 / np.sqrt(M_ring))
+        lamc_neu = 0.951 * u.um / (1. + 3.616 / np.sqrt(M_ring))
+        lamc_ion = 1.125 * u.um / (1. + 2.567 / np.sqrt(M_ring))
 
-        x = (1.0 * u.um / wavelength_arr.to(u.um)).value
+        x = (1. * u.um / wavelength_arr).value
         c_abs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
         c_abs_neu_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
 
-        for i, _ in enumerate(radius_arr):
-            # Graphite contribtuion
-            volume = (4.0 / 3.0) * np.pi * radius_arr[i] ** 3
-            c_abs_ion_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
-            c_abs_neu_out[i, :] += xi_gra[i] * cabs_V_graphite_out * volume
+        for i in range(len(radius_arr)):
+            graph_cont = self.cabs_graphite_spl.ev(radius_arr[i].to(u.um), wavelength_arr.value)*u.cm**2
+            c_abs_ion_out[i, :] += xi_gra[i]*graph_cont
+            c_abs_neu_out[i, :] += xi_gra[i]*graph_cont
 
             # PAH contribution
-            C_fac_neu = C_func(
-                (wavelength_arr.to(u.um) / lamc_neu[i]).value ** -1
-            )  # Note error in Equation A7, should be C(lambda_c/lambda)
-            C_fac_ion = C_func(
-                (wavelength_arr.to(u.um) / lamc_ion[i]).value ** -1
-            )  # Note error in Equation A7, should be C(lambda_c/lambda)
-            S_mat_neu = np.zeros((len(self.lamj_tab), len(wavelength_arr))) * u.cm**2
-            S_mat_ion = np.zeros((len(self.lamj_tab), len(wavelength_arr))) * u.cm**2
-            for j, _ in enumerate(self.lamj_tab):
-                if self.hc_tab[j] == 0:
-                    S_mat_neu[j, :] = S_func(wavelength_arr.to(u.um), self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j])
-                    S_mat_ion[j, :] = S_func(wavelength_arr.to(u.um), self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j])
+            C_fac_neu = C_func((wavelength_arr/lamc_neu[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
+            C_fac_ion = C_func((wavelength_arr/lamc_ion[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
+            S_mat_neu = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
+            S_mat_ion = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
+            for j in range(len(self.lamj_tab)):
+                if(self.hc_tab[j] == 0):
+                    S_mat_neu[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j])
+                    S_mat_ion[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j])
                 else:
-                    S_mat_neu[j, :] = S_func(wavelength_arr.to(u.um), self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j] * HC[i])
-                    S_mat_ion[j, :] = S_func(wavelength_arr.to(u.um), self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j] * HC[i])
+                    S_mat_neu[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j]*HC[i])
+                    S_mat_ion[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j]*HC[i])
 
             idx = np.where((10 < x) & (x < 15))
-            c_abs_ion_out[i, idx] += (
-                (S_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                (S_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
-            )
+            c_abs_ion_out[i, idx] += (S_mat_ion[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (S_mat_neu[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
 
             idx = np.where((7.7 < x) & (x <= 10))
-            c_abs_ion_out[i, idx] += (
-                (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
-                * 1.0e-18
-                * u.cm**2
-                * nc[i]
-                * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
-                * 1.0e-18
-                * u.cm**2
-                * nc[i]
-                * (1.0 - xi_gra[i])
-            )
+            c_abs_ion_out[i, idx] += (66.302 - 24.367*x[idx] + 2.950*x[idx]**2 - 0.1057*x[idx]**3)*1.e-18*u.cm**2*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (66.302 - 24.367*x[idx] + 2.950*x[idx]**2 - 0.1057*x[idx]**3)*1.e-18*u.cm**2*nc[i]*(1.-xi_gra[i])
 
             idx = np.where((5.9 < x) & (x <= 7.7))
-            c0 = 1.8687e-18 * u.cm**2
-            c1 = 1.905e-19 * u.cm**2
-            c2 = 4.175e-19 * u.cm**2
-            c3 = 4.37e-20 * u.cm**2  # Note Equations A11 and A12 are mislabeled
-            c_abs_ion_out[i, idx] += (
-                (S_mat_ion[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
-                * nc[i]
-                * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                (S_mat_neu[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
-                * nc[i]
-                * (1.0 - xi_gra[i])
-            )
+            c0 = 1.8687e-18*u.cm**2
+            c1 = 1.905e-19*u.cm**2
+            c2 = 4.175e-19*u.cm**2
+            c3 = 4.37e-20*u.cm**2 # Note Equations A11 and A12 are mislabeled
+            c_abs_ion_out[i, idx] += (S_mat_ion[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (S_mat_neu[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
 
             idx = np.where((3.3 < x) & (x <= 5.9))
-            c_abs_ion_out[i, idx] += (S_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
-            c_abs_neu_out[i, idx] += (S_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+            c_abs_ion_out[i, idx] += (S_mat_ion[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (S_mat_neu[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
 
             idx = np.where(x <= 3.3)
-            c_abs_ion_out[i, idx] += (
-                34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * C_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
-            )
+            c_abs_ion_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*C_fac_ion[idx]*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*C_fac_neu[idx]*nc[i]*(1.-xi_gra[i])
 
             for j in range(len(self.lamj_tab)):
-                if j > 1:
-                    c_abs_ion_out[i, idx] += S_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
-                    c_abs_neu_out[i, idx] += S_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                if (j > 1):
+                    c_abs_ion_out[i, idx] += S_mat_ion[j,idx]*nc[i]*(1.-xi_gra[i])
+                    c_abs_neu_out[i, idx] += S_mat_neu[j,idx]*nc[i]*(1.-xi_gra[i])
 
-            c_abs_ion_out[i, idx] += (
-                3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i]) * u.cm**2
-            )  # Note: does not appear in D21+
+            c_abs_ion_out[i, idx] += 3.5e-19*10**(-1.45/x[idx])*np.exp(-(0.1*x[idx])**2)*nc[i]*(1.-xi_gra[i])*u.cm**2 # Note: does not appear in D21+
 
         return c_abs_ion_out, c_abs_neu_out
+
     
     # TODO: make this a private method again
     def scale_basis_spectra(self, photon_wavelength_arr, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
