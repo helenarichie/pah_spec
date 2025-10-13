@@ -1,4 +1,4 @@
-# Code Documentation
+# Documentation
 
 Dependencies: astropy, numpy, pandas, scipy
 
