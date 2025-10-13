@@ -46,6 +46,33 @@ class PahSpec:
 
 
     def generate_spectrum(self, wavelength_arr, u_lambda_arr, size_dist_neu, size_dist_ion):
+        """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
+
+        Parameters
+        ----------
+        wavelength_arr : astropy.units.Quantity (array_like)
+            Wavelength array for the radiation field u_lambda in u.um
+        u_lambda_arr : astropy.units.Quantity (array_like)
+            Array of length len(wavelength_arr) with the radiation field in u.erg / u.cm ** 4
+        size_dist_neu : array_like
+            Neutral PAH size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+        size_dist_ion : array_like
+            Ionized PAH size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+
+        Returns
+        -------
+        spectrum_neu : astropy.units.Quantity (array_like)
+            Size- and ionization-integrated spectrum for neutral PAHs heated by the input u_lambda in u.erg / (u.cm * u.s)
+        spectrum_ion : astropy.units.Quantity (array_like)
+            Size- and ionization-integrated spectrum for neutral PAHs heated by the input u_lambda in u.erg / (u.cm * u.s)
+
+        Raises
+        ------
+        AttributeError
+            If the input is not an astropy.units.Quantity object
+        TypeError
+            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+        """
         _check_param(wavelength_arr, u.um)
         _check_param(u_lambda_arr, u.erg / u.cm ** 4)
 
@@ -97,9 +124,9 @@ class PahSpec:
                 basis_dict_ion[str(lambda_abs.value)] = _basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_ion, temp_arr, energy_arr)
 
             df = pd.DataFrame(basis_dict_neu)
-            df.to_csv(os.path.join(output_directory, f"basis_neu_{grain_size.to(u.AA):.3f}"), index=False)
+            df.to_csv(os.path.join(output_directory, f"basis_neu_{grain_size.to(u.AA).value:.3f}"), index=False)
             df = pd.DataFrame(basis_dict_ion)
-            df.to_csv(os.path.join(output_directory, f"basis_ion_{grain_size.to(u.AA):.3f}"), index=False)
+            df.to_csv(os.path.join(output_directory, f"basis_ion_{grain_size.to(u.AA).value:.3f}"), index=False)
 
         photon_wavelengths = [s.value for s in photon_wavelengths]
         emission_wavelengths = [s.value for s in emission_wavelengths]
@@ -139,6 +166,7 @@ class PahSpec:
             If the input is not an astropy.units.Quantity object
         TypeError
             If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+        # TODO: update since data loading has been moved to PahSpec initialization
         FileNotFoundError
             If the directory data_path does not exist
         """
@@ -272,7 +300,7 @@ class PahSpec:
 
         return c_abs_ion_out, c_abs_neu_out
     
-
+    # TODO: make this a private method again
     def scale_basis_spectra(self, photon_wavelength_arr, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
         """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
 
@@ -874,6 +902,39 @@ def convert_temp_to_prob(dt_arr, temp_arr, temp_cutoff):
 
     return temp_avg_sub, (dt_arr_sub / dT_sub) / area
 
+# TODO: finalize basis spectra
+"""def _read_basis_spectra_for_ionization(filename, dims):
+    df = pd.read_csv(filename)
+    
+    basis_spectra_i = np.zeros((dims))
+    for j, col in enumerate(df):
+        basis_spectra_i[j-1] = df[col].to_numpy()
+    basis_spectra_i *= u.erg / (u.s * u.cm)
+
+    return basis_spectra_i
+
+
+def _read_basis_spectra(basis_directory, grain_sizes):
+
+    df = pd.read_csv(os.path.join(basis_directory, "lambda_em.csv"))
+    emission_wavelengths = df["lambda_em [um]"].to_numpy(dtype=float) * u.um
+
+    df = pd.read_csv(os.path.join(basis_directory, "lambda_abs.csv"))
+    photon_wavelengths = df["lambda_abs [um]"].to_numpy(dtype=float) * u.um
+
+    dims = (len(photon_wavelengths), len(emission_wavelengths))
+
+    basis_spectra_neu = np.zeros((len(grain_sizes), dims[0], dims[1])) * u.erg / (u.s * u.cm)
+    basis_spectra_ion = np.zeros((len(grain_sizes), dims[0], dims[1])) * u.erg / (u.s * u.cm)
+    for i, grain_size in enumerate(grain_sizes):
+
+        filename_neu = os.path.join(basis_directory, f"neu/basis_neu_{grain_size.to(u.AA).value:.3f}")
+        filename_ion = os.path.join(basis_directory, f"ion/basis_ion_{grain_size.to(u.AA).value:.3f}")
+
+        basis_spectra_neu[i] = _read_basis_spectra_for_ionization(filename_neu, dims)
+        basis_spectra_ion[i] = _read_basis_spectra_for_ionization(filename_ion, dims)
+
+    return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion"""
 
 def _read_basis_spectra_for_ionization(filename):
     df = pd.read_csv(filename)
@@ -906,3 +967,37 @@ def _read_basis_spectra(basis_directory, grain_sizes):
         basis_spectra_ion.append(basis_spectra_ion_i)
 
     return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion
+
+
+def _read_d21_size_dist(ion_frac, size_dist, data_path="../data/"):
+    # TODO: tidy and implement defaults
+    files = []
+    for i in sorted(os.listdir(data_path)):
+        if os.path.isfile(os.path.join(data_path, i)) and all(sub in i for sub in ["dnda.out", ion_frac, size_dist]):
+            files.append(i)
+
+    if len(files) > 1:
+        print(f"warning: more than one size distibution file in {data_path}")
+
+    rad, size_dist_ion, size_dist_neu = [], [], []
+    df = pd.read_csv(os.path.join(data_path, files[0]), sep="\\s+", skiprows=1)
+    rad = df["rad"].to_numpy() * u.um
+    size_dist_ion = df["dn_{PAH+}"].to_numpy()
+    size_dist_neu = df["dn_{PAH0}"].to_numpy()
+    return rad, size_dist_ion, size_dist_neu, files
+
+
+def _read_d21_radiation_field(data_path="../data/"):
+    # TODO: tidy and implement defaults
+    files = []
+    for i in sorted(os.listdir(data_path)):
+        if os.path.isfile(os.path.join(data_path, i)) and i.startswith("isrf"):
+            files.append(i)
+
+    wavelength_arr_u, u_lambda_arr = [], []
+    for i, file_i in enumerate(files):
+        df = pd.read_csv(os.path.join(data_path, file_i), sep="\\s+", skiprows=6)
+        wavelength_arr_u.append(df["(um)"].to_numpy() * u.um)
+        u_lambda_arr.append(df["(erg"].to_numpy() * (u.erg / u.cm ** 3) / wavelength_arr_u[i].to(u.cm))
+
+    return wavelength_arr_u, u_lambda_arr, files
