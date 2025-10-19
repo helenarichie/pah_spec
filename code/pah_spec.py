@@ -9,62 +9,76 @@ from scipy.integrate import trapezoid
 from scipy import interpolate
 
 
-GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04, 4.7315e-04, 5.0119e-04, 5.3088e-04,
-                5.6234e-04, 5.9566e-04, 6.3096e-04, 6.6834e-04, 7.0795e-04, 7.4989e-04, 7.9433e-04, 8.4140e-04,
-                8.9125e-04, 9.4406e-04, 1.0000e-03, 1.0593e-03, 1.1220e-03, 1.1885e-03, 1.2589e-03, 1.3335e-03,
-                1.4125e-03, 1.4962e-03, 1.5849e-03, 1.6788e-03, 1.7783e-03, 1.8836e-03, 1.9953e-03, 2.1135e-03, 
-                2.2387e-03, 2.3714e-03, 2.5119e-03] * u.um
+GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04, 
+ 4.7315e-04, 5.0119e-04, 5.3088e-04, 5.6234e-04, 5.9566e-04, 6.3096e-04, 
+ 6.6834e-04, 7.0795e-04, 7.4989e-04, 7.9433e-04, 8.4140e-04, 8.9125e-04, 
+ 9.4406e-04, 1.0000e-03, 1.0593e-03, 1.1220e-03, 1.1885e-03, 1.2589e-03, 
+ 1.3335e-03, 1.4125e-03, 1.4962e-03, 1.5849e-03, 1.6788e-03, 1.7783e-03, 
+ 1.8836e-03, 1.9953e-03, 2.1135e-03, 2.2387e-03, 2.3714e-03, 2.5119e-03, 
+ 2.6607e-03, 2.8184e-03, 2.9854e-03, 3.1623e-03, 3.3497e-03, 3.5481e-03, 
+ 3.7584e-03, 3.9811e-03, 4.2170e-03, 4.4668e-03, 4.7315e-03, 5.0119e-03, 
+ 5.3088e-03, 5.6234e-03, 5.9566e-03, 6.3096e-03, 6.683E-03, 7.079E-03, 
+ 7.499E-03, 7.943E-03, 8.414E-03, 8.913E-03, 9.441E-03, 1.00E-02] * u.um
+
 _DELTA_LAMBDA = 0.01
 
 
 class PahSpec:
 
     def __init__(self, basis_directory="../data/basis_spectra", c_abs_data_directory="../data/c_abs_data"):
+        # Path of pah_spec.py
+        script_path = os.path.dirname(os.path.abspath(__file__))
 
-        script_directory = os.path.dirname(os.path.abspath(__file__))
-
-        if not os.path.exists(os.path.join(script_directory, c_abs_data_directory)):
+        # Check if the cross section path exists
+        if not os.path.exists(os.path.join(script_path, c_abs_data_directory)):
           raise FileNotFoundError(
             f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {c_abs_data_directory}, but the path does not exist"
         )
-        if not os.path.exists(os.path.join(script_directory, basis_directory)):
+        # Check if the basis spectra path exists
+        if not os.path.exists(os.path.join(script_path, basis_directory)):
           raise FileNotFoundError(
             f"Exptected to find basis spectra at {basis_directory}, but the path does not exist"
         )
 
-        self.emission_wavelengths, self.photon_wavelengths, self.basis_spectra_neu, self.basis_spectra_ion = _read_basis_spectra(os.path.join(script_directory, basis_directory), GRAIN_SIZES)
+        # Load the basis spectra into memory
+        self.emission_wavelengths, self.photon_wavelengths, self.basis_spectra_neu, self.basis_spectra_ion = _read_basis_spectra(os.path.join(script_path, basis_directory))
 
-        self.wav_graphite, self.qabs = np.genfromtxt(os.path.join(script_directory, c_abs_data_directory, "qabs_001um.dat"), unpack=True, usecols=[0, 2])
+        # Load the cross section data into memory
+        self.wav_graphite, self.qabs = np.genfromtxt(os.path.join(script_path, c_abs_data_directory, "qabs_001um.dat"), unpack=True, usecols=[0, 2])
         self.wav_graphite *= u.um
-
         self.lamj_tab, self.gamj_tab, self.sigj_neu_tab, self.sigj_ion_tab, self.hc_tab = np.genfromtxt(
-            os.path.join(c_abs_data_directory, os.path.join(script_directory, c_abs_data_directory, "draine21_Table4.dat")), unpack=True
+            os.path.join(c_abs_data_directory, os.path.join(script_path, c_abs_data_directory, "draine21_Table4.dat")), unpack=True
         )
         self.lamj_tab *= u.um
         self.sigj_neu_tab *= 1.0e-20
         self.sigj_ion_tab *= 1.0e-20
         self.sigj_neu_tab *= u.cm
         self.sigj_ion_tab *= u.cm
-
-        hdul = fits.open('../data/c_abs_data/graphite_cabs.fits')
+        hdul = fits.open(os.path.join(script_path, c_abs_data_directory, "graphite_cabs.fits"))
         rad_graphite = hdul[1].data*u.um
         wav_graphite = hdul[2].data*u.um
         cabs_graphite = hdul[3].data*u.cm**2
-
         self.cabs_graphite_spl = interpolate.RectBivariateSpline(rad_graphite.value, wav_graphite.value, cabs_graphite.value)
 
-    def generate_spectrum(self, wavelength_arr, u_lambda_arr, size_dist_neu, size_dist_ion):
+        # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion; Draine et al. 2021)
+        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(script_path)
+
+        # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
+        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(script_path)
+
+
+    def generate_spectrum(self, wavelength_arr=None, u_lambda_arr=None, size_dist_neu=None, size_dist_ion=None):
         """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
 
         Parameters
         ----------
-        wavelength_arr : astropy.units.Quantity (array_like)
+        wavelength_arr : astropy.units.Quantity (array_like), optional
             Wavelength array for the radiation field u_lambda (in u.um)
-        u_lambda_arr : astropy.units.Quantity (array_like)
+        u_lambda_arr : astropy.units.Quantity (array_like), optional
             Array of length len(wavelength_arr) with the radiation field (in u.erg / u.cm ** 4)
-        size_dist_neu : array_like
+        size_dist_neu : array_like, optional
             PAH0 size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
-        size_dist_ion : array_like
+        size_dist_ion : array_like, optional
             PAH+ size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
 
         Returns
@@ -81,30 +95,37 @@ class PahSpec:
         TypeError
             If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
+        # If the radiation field, size distribution, or ionization function is not specified, then use the defaults
+        if wavelength_arr is None:
+            wavelength_arr = self.wavelength_u_arr
+        if u_lambda_arr is None:
+            u_lambda_arr = self.u_lambda_arr
+        if size_dist_neu is None:
+            size_dist_neu = self.size_dist_neu
+        if size_dist_ion is None:
+            size_dist_ion = self.size_dist_ion
+
         _check_param(wavelength_arr, u.um)
         _check_param(u_lambda_arr, u.erg / u.cm ** 4)
 
         spectra_neu_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * u.erg / (u.cm * u.s)
         spectra_ion_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * u.erg / (u.cm * u.s)
         for i, grain_size in enumerate(GRAIN_SIZES):
-            spectra_neu_a[i] = np.sum(self.scale_basis_spectra(self.photon_wavelengths, _DELTA_LAMBDA, self.emission_wavelengths, grain_size.to(u.AA), wavelength_arr, u_lambda_arr, self.basis_spectra_neu[i], ion=False), axis=0)
-            spectra_ion_a[i] = np.sum(self.scale_basis_spectra(self.photon_wavelengths, _DELTA_LAMBDA, self.emission_wavelengths, grain_size.to(u.AA), wavelength_arr, u_lambda_arr, self.basis_spectra_ion[i], ion=True), axis=0)
+            spectra_neu_a[i] = np.sum(self._scale_basis_spectra(self.photon_wavelengths, _DELTA_LAMBDA, self.emission_wavelengths, grain_size.to(u.AA), wavelength_arr, u_lambda_arr, self.basis_spectra_neu[i], ion=False), axis=0)
+            spectra_ion_a[i] = np.sum(self._scale_basis_spectra(self.photon_wavelengths, _DELTA_LAMBDA, self.emission_wavelengths, grain_size.to(u.AA), wavelength_arr, u_lambda_arr, self.basis_spectra_ion[i], ion=True), axis=0)
 
         spectrum_neu = _size_integrate(spectra_neu_a, size_dist_neu)
         spectrum_ion = _size_integrate(spectra_ion_a, size_dist_ion)
 
         return spectrum_neu, spectrum_ion
     
-    def generate_basis_spectra(self, grain_sizes, lambda_min, lambda_max, emission_wavelengths, output_directory="./", c_abs_neu=None, c_abs_ion=None):
 
+    def generate_basis_spectra(self, grain_sizes, emission_wavelengths, output_directory="./", ion=False, lambda_min=0.0912*u.um, lambda_max=10*u.um):
+        # TODO: add cross-section argument
         _check_param(grain_sizes, u.AA)
         _check_param(lambda_min, u.um)
         _check_param(lambda_max, u.um)
         _check_param(emission_wavelengths, u.um, iterable=True)
-        if c_abs_neu != None:
-            _check_param(c_abs_neu, u.cm ** 2, iterable=True)
-        if c_abs_ion != None:
-            _check_param(c_abs_ion, u.cm ** 2, iterable=True)
 
         if not os.path.exists(output_directory):
             print(f"Path {output_directory} does not exist.")
@@ -113,28 +134,29 @@ class PahSpec:
         photon_wavelengths = _generate_photon_wavelengths(_DELTA_LAMBDA, lambda_min, lambda_max)
 
         for grain_size in grain_sizes:
-
-            if c_abs_neu == None:
-                c_abs_neu = self.calc_c_abs(emission_wavelengths, grain_size)[1][0]
-            if c_abs_ion == None:
-                c_abs_ion = self.calc_c_abs(emission_wavelengths, grain_size)[0][0]
+            if not ion:
+                c_abs = self.calc_c_abs(emission_wavelengths, grain_size)[1][0]
+                print(f"C_abs computed for PAH0 of size {grain_size:.2f}")
+            else:
+                c_abs = self.calc_c_abs(emission_wavelengths, grain_size)[0][0]
+                print(f"C_abs computed for PAH+ of size {grain_size:.2f}")
             
             temp_arr = np.linspace(1, 5e3, 10000) * u.K
             energy_arr = calc_pah_energy(grain_size, temp_arr)
 
-            basis_dict_neu = dict()
-            basis_dict_ion = dict()
-            # basis_spectra_ion = np.zeros((len(photon_wavelengths, len(emission_wavelengths)))) * u.erg / (u.cm * u.s)
+            basis_dict = dict()
 
             for i, lambda_abs in enumerate(photon_wavelengths):
+                if not ion:
+                    basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr)
+                else:
+                    basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr)
 
-                basis_dict_neu[str(lambda_abs.value)] = _basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_neu, temp_arr, energy_arr)
-                basis_dict_ion[str(lambda_abs.value)] = _basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_ion, temp_arr, energy_arr)
-
-            df = pd.DataFrame(basis_dict_neu)
-            df.to_csv(os.path.join(output_directory, f"basis_neu_{grain_size.to(u.AA).value:.3f}"), index=False)
-            df = pd.DataFrame(basis_dict_ion)
-            df.to_csv(os.path.join(output_directory, f"basis_ion_{grain_size.to(u.AA).value:.3f}"), index=False)
+            df = pd.DataFrame(basis_dict)
+            if not ion:
+                df.to_pickle(os.path.join(output_directory, f"basis_neu_{grain_size.to(u.AA).value:.3f}.pkl"))
+            else:
+                df.to_pickle(os.path.join(output_directory, f"basis_ion_{grain_size.to(u.AA).value:.3f}.pkl"))
 
         photon_wavelengths = [s.value for s in photon_wavelengths]
         emission_wavelengths = [s.value for s in emission_wavelengths]
@@ -174,10 +196,8 @@ class PahSpec:
             If the input is not an astropy.units.Quantity object
         TypeError
             If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
-        # TODO: update since data loading has been moved to PahSpec initialization
-        FileNotFoundError
-            If the directory data_path does not exist
         """
+        # TODO: check that grain does not exceed maximum allowed size
 
         wavelength_unit, radius_unit = u.um, u.AA
 
@@ -263,8 +283,7 @@ class PahSpec:
         return c_abs_ion_out, c_abs_neu_out
 
     
-    # TODO: make this a private method again
-    def scale_basis_spectra(self, photon_wavelength_arr, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
+    def _scale_basis_spectra(self, photon_wavelength_arr, dlambda, wavelength_arr, grain_radius, wavelength_arr_u, u_lambda_arr, p_lambda_arr, ion):
         """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
 
         Parameters
@@ -344,37 +363,11 @@ class PahSpec:
             denominator = trapezoid(p_lambda_arr[i], x=wavelength_arr.to(u.cm))
 
             normalizations[i] = numerator / denominator
-
-        # return np.sum(p_lambda_arr * normalizations[:, np.newaxis], axis=0)
+            
         return p_lambda_arr * normalizations[:, np.newaxis]
-    
 
-def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
-    _check_param(lambda_min, u.um)
-    _check_param(lambda_max, u.um)
 
-    # define photon/basis vector wavelengths
-    lambda_i = lambda_min.value
-    photon_wavelengths = [lambda_i]
-    while lambda_i < lambda_max.value:
-        lambda_i += dlambda * lambda_i
-        photon_wavelengths.append(lambda_i)
-    photon_wavelengths *= u.um
-
-    return photon_wavelengths
-    
-
-def _size_integrate(scaled_basis_spectra, size_dist):
-
-    size_integrated_spectrum = []
-
-    for i, _ in enumerate(GRAIN_SIZES):
-        size_integrated_spectrum.append(size_dist[i] * scaled_basis_spectra[i].value)
-
-    size_integrated_spectrum = np.sum(np.array(size_integrated_spectrum), axis=0) * scaled_basis_spectra.unit
-
-    return size_integrated_spectrum
-
+############################## general pah_spec methods ##############################
 
 def calc_pah_energy(grain_radius, temp_arr):
     """Calculate PAH vibrational energy as a function of temperature.
@@ -646,10 +639,10 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     time_i, energy_i, temp_i = 0 * u.s, energy_abs, temp_abs
     time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_i.value], []
     dt_unit, time_unit, temp_unit = None, None, None
-    # ensure timestep is not changing too rapidly
-    dE_max = 0.005
+    # The change in energy per timestep, results are converged for dE < 1%
+    dE_max = 0.01
 
-    while temp_i.value > 5:
+    while temp_i.value > 5.1:
         dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
 
         dt = dE_max * energy_i / dE_dt
@@ -717,15 +710,13 @@ def _calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
     return basis_vector * unit
 
 
-def _basis_spectrum(lambda_abs, grain_size, emission_wavelengths, c_abs_arr, temp_arr, energy_arr):
+def _compute_basis_spectrum(lambda_abs, grain_size, emission_wavelengths, c_abs_arr, temp_arr, energy_arr):
     dt_arr, time_arr, temp_arr_t = _calc_pah_cooling(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr)
     temp_arr_t = temp_arr_t[0:-1]  # make array same length as weighting array
     temp_weights = dt_arr / np.sum(dt_arr)
 
     return _calc_basis_vector(emission_wavelengths, temp_weights, temp_arr_t, c_abs_arr)
 
-
-################# Utility functions #################
 
 def _calc_nh(nc):
     """Eq. 8 of Draine & Li (2001)"""
@@ -844,40 +835,34 @@ def _planck_function_lambd(lambd, T):
     _check_param(T, u.K)
     return (2 * h.cgs * c.cgs**2 / lambd**5) * 1 / (np.exp(h.cgs * c.cgs / (lambd * k_B.cgs * T)) - 1)
 
-# TODO: decide if this needs to be in here
-def convert_temp_to_prob(dt_arr, temp_arr, temp_cutoff):
-    dT = abs(np.diff(temp_arr))
 
-    temp_avg = []
-    for i, temp in enumerate(temp_arr):
-        if (i + 1) < len(temp_arr):
-            temp_avg.append((temp_arr[i].value + temp_arr[i + 1].value) / 2)
+def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
+    _check_param(lambda_min, u.um)
+    _check_param(lambda_max, u.um)
 
-    temp_avg *= u.K
+    # define photon/basis vector wavelengths
+    lambda_i = lambda_min.value
+    photon_wavelengths = [lambda_i]
+    while lambda_i < lambda_max.value:
+        lambda_i += dlambda * lambda_i
+        photon_wavelengths.append(lambda_i)
+    photon_wavelengths *= u.um
 
-    temp_avg_sub = temp_avg[temp_avg.value >= temp_cutoff.value]
-    print(temp_avg_sub[0], temp_avg_sub[-1])
+    return photon_wavelengths
 
-    dT_sub = dT[temp_avg.value >= temp_cutoff.value]
-    dt_arr_sub = dt_arr[temp_avg.value >= temp_cutoff.value]
 
-    area = -trapezoid(dt_arr_sub / dT_sub, x=temp_avg_sub)
-
-    return temp_avg_sub, (dt_arr_sub / dT_sub) / area
-
-# TODO: finalize basis spectra
-"""def _read_basis_spectra_for_ionization(filename, dims):
-    df = pd.read_csv(filename)
+def _read_basis_spectra_for_ionization(filename, dims):
+    df = pd.read_pickle(filename)
     
     basis_spectra_i = np.zeros((dims))
     for j, col in enumerate(df):
-        basis_spectra_i[j-1] = df[col].to_numpy()
+        basis_spectra_i[j] = df[col].to_numpy()
     basis_spectra_i *= u.erg / (u.s * u.cm)
 
     return basis_spectra_i
 
 
-def _read_basis_spectra(basis_directory, grain_sizes):
+def _read_basis_spectra(basis_directory):
 
     df = pd.read_csv(os.path.join(basis_directory, "lambda_em.csv"))
     emission_wavelengths = df["lambda_em [um]"].to_numpy(dtype=float) * u.um
@@ -887,80 +872,46 @@ def _read_basis_spectra(basis_directory, grain_sizes):
 
     dims = (len(photon_wavelengths), len(emission_wavelengths))
 
-    basis_spectra_neu = np.zeros((len(grain_sizes), dims[0], dims[1])) * u.erg / (u.s * u.cm)
-    basis_spectra_ion = np.zeros((len(grain_sizes), dims[0], dims[1])) * u.erg / (u.s * u.cm)
-    for i, grain_size in enumerate(grain_sizes):
+    basis_spectra_neu = np.zeros((len(GRAIN_SIZES), dims[0], dims[1])) * u.erg / (u.s * u.cm)
+    basis_spectra_ion = np.zeros((len(GRAIN_SIZES), dims[0], dims[1])) * u.erg / (u.s * u.cm)
+    for i, grain_size in enumerate(GRAIN_SIZES):
 
-        filename_neu = os.path.join(basis_directory, f"neu/basis_neu_{grain_size.to(u.AA).value:.3f}")
-        filename_ion = os.path.join(basis_directory, f"ion/basis_ion_{grain_size.to(u.AA).value:.3f}")
+        filename_neu = os.path.join(basis_directory, f"neu/basis_neu_{grain_size.to(u.AA).value:.3f}.pkl")
+        filename_ion = os.path.join(basis_directory, f"ion/basis_ion_{grain_size.to(u.AA).value:.3f}.pkl")
 
         basis_spectra_neu[i] = _read_basis_spectra_for_ionization(filename_neu, dims)
         basis_spectra_ion[i] = _read_basis_spectra_for_ionization(filename_ion, dims)
 
-    return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion"""
-
-def _read_basis_spectra_for_ionization(filename):
-    df = pd.read_csv(filename)
-    # TODO: move photon wavelengths and emission wavelengths into their own file
-    photon_wavelengths = df.columns[1:].to_numpy(dtype=float) * u.um
-    emission_wavelengths = df["emission_wavelengths"].to_numpy(dtype=float) * u.um
-    
-    basis_spectra_i = np.zeros((len(photon_wavelengths), len(emission_wavelengths)))
-    for j, col in enumerate(df):
-        if df.columns[j] != "emission_wavelengths":
-            basis_spectra_i[j-1] = df[col].to_numpy()
-    basis_spectra_i *= u.erg / (u.s * u.cm)
-
-    return basis_spectra_i, photon_wavelengths, emission_wavelengths
-
-
-def _read_basis_spectra(basis_directory, grain_sizes):
-
-    photon_wavelengths, emission_wavelengths  = None, None
-    basis_spectra_ion, basis_spectra_neu = [], []
-    for grain_size in grain_sizes:
-
-        filename_neu = os.path.join(basis_directory, f"neu/basis_{grain_size.to(u.AA).value:.2f}_neu.csv")
-        filename_ion = os.path.join(basis_directory, f"ion/basis_{grain_size.to(u.AA).value:.2f}.csv")
-
-        basis_spectra_neu_i, photon_wavelengths, emission_wavelengths = _read_basis_spectra_for_ionization(filename_neu)
-        basis_spectra_ion_i, _, _ = _read_basis_spectra_for_ionization(filename_ion)
-        
-        basis_spectra_neu.append(basis_spectra_neu_i)
-        basis_spectra_ion.append(basis_spectra_ion_i)
-
     return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion
 
 
-def _read_d21_size_dist(ion_frac, size_dist, data_path="../data/"):
-    # TODO: tidy and implement defaults
-    files = []
-    for i in sorted(os.listdir(data_path)):
-        if os.path.isfile(os.path.join(data_path, i)) and all(sub in i for sub in ["dnda.out", ion_frac, size_dist]):
-            files.append(i)
+def _read_size_dist(script_path):
+    data_path = os.path.join(script_path, "../data/defaults/")
 
-    if len(files) > 1:
-        print(f"warning: more than one size distibution file in {data_path}")
-
-    rad, size_dist_ion, size_dist_neu = [], [], []
-    df = pd.read_csv(os.path.join(data_path, files[0]), sep="\\s+", skiprows=1)
+    df = pd.read_csv(os.path.join(data_path, "pahspec_dnda.out_st_std"), sep="\\s+", skiprows=1)
     rad = df["rad"].to_numpy() * u.um
-    size_dist_ion = df["dn_{PAH+}"].to_numpy()
     size_dist_neu = df["dn_{PAH0}"].to_numpy()
-    return rad, size_dist_ion, size_dist_neu, files
+    size_dist_ion = df["dn_{PAH+}"].to_numpy()
+
+    return rad, size_dist_neu, size_dist_ion
 
 
-def _read_d21_radiation_field(data_path="../data/"):
-    # TODO: tidy and implement defaults
-    files = []
-    for i in sorted(os.listdir(data_path)):
-        if os.path.isfile(os.path.join(data_path, i)) and i.startswith("isrf"):
-            files.append(i)
+def _read_radiation_field(script_path):
+    data_path = os.path.join(script_path, "../data/defaults/")
 
-    wavelength_arr_u, u_lambda_arr = [], []
-    for i, file_i in enumerate(files):
-        df = pd.read_csv(os.path.join(data_path, file_i), sep="\\s+", skiprows=6)
-        wavelength_arr_u.append(df["(um)"].to_numpy() * u.um)
-        u_lambda_arr.append(df["(erg"].to_numpy() * (u.erg / u.cm ** 3) / wavelength_arr_u[i].to(u.cm))
+    df = pd.read_csv(os.path.join(data_path, "isrf_mmpisrf_0.00"), sep="\\s+", skiprows=6)
+    wavelength_arr_u = df["(um)"].to_numpy() * u.um        
+    u_lambda_arr = df["(erg"].to_numpy() * (u.erg / u.cm ** 3) / wavelength_arr_u.to(u.cm)
 
-    return wavelength_arr_u, u_lambda_arr, files
+    return wavelength_arr_u, u_lambda_arr
+
+
+def _size_integrate(scaled_basis_spectra, size_dist):
+    # Assumes size_dist acounts for size distribution and ionization function
+    weighted_spectra = np.zeros((len(GRAIN_SIZES), len(scaled_basis_spectra[0])))
+    for i, _ in enumerate(GRAIN_SIZES):
+        weighted_spectra[i] = size_dist[i] * scaled_basis_spectra[i].value
+
+    size_integrated_spectrum = np.sum(np.array(weighted_spectra), axis=0) * scaled_basis_spectra.unit
+
+    return size_integrated_spectrum
