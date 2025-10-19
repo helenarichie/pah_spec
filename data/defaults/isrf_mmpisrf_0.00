@@ -1,4 +1,4 @@
- MMP83 spec, log(U)=  0.000   
+ MMP83 spec, log(U)=  0.000
  1.000E+00 = U (heating rate factor)
  1.460E-12 = u( h nu < 13.6eV) (erg cm-3)
  1.043E-12 = u_starlight( h nu < 13.6eV) (erg cm-3)
