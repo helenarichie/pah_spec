@@ -121,11 +121,41 @@ class PahSpec:
     
 
     def generate_basis_spectra(self, grain_sizes, emission_wavelengths, output_directory="./", ion=False, lambda_min=0.0912*u.um, lambda_max=10*u.um):
+        """Generates basis spectra file for input grain sizes for an ionized or neutral PAHs.
+
+        Parameters
+        ----------
+        grain_sizes : astropy.units.Quantity (float or array_like)
+            Array of dust grain radii to calculate basis spectra for
+        emission_wavelengths : astropy.units.Quantity (array_like)
+            Array of emission wavelengths to define basis spectra over
+        output_directory : str, optional
+            Directory to output basis spectra to, default is ./
+        ion : Bool, optional
+            PAH ionization to run basis spectra for, default is False
+        lambda_min : astropy.units.Quantity, optional
+            Lowest lambda_abs wavelength, recommended default is 912 A
+        Lambda_max : astropy.units.Quantity, optional
+            Highest lambda_abs wavelength, recommended default is 912 um
+        
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        AttributeError
+            If the input is not an astropy.units.Quantity object
+        TypeError
+            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+        """
         # TODO: add cross-section argument
-        _check_param(grain_sizes, u.AA)
+        grain_sizes = _check_param(grain_sizes, u.AA, force_iterable=True)
         _check_param(lambda_min, u.um)
         _check_param(lambda_max, u.um)
         _check_param(emission_wavelengths, u.um, iterable=True)
+
+        print(grain_sizes)
 
         if not os.path.exists(output_directory):
             print(f"Path {output_directory} does not exist.")
@@ -639,8 +669,8 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     time_i, energy_i, temp_i = 0 * u.s, energy_abs, temp_abs
     time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_i.value], []
     dt_unit, time_unit, temp_unit = None, None, None
-    # The change in energy per timestep, results are converged for dE < 1%
-    dE_max = 0.01
+    # The change in energy per timestep, results are converged for dE < 3%
+    dE_max = 0.03
 
     while temp_i.value > 5.1:
         dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
