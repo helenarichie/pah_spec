@@ -6,5 +6,4 @@ Tested with python 3.13.7, astropy 6.1.2, numpy 2.3.2, pandas 2.3.2, scipy 1.16.
 
 For instructions on code usage, see the examples in [code/generate_spectrum_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/code/generate_spectrum_example.ipynb) and [code/generate_basis_spectra_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/code/generate_basis_spectra_example.ipynb).
 
-Temporary data repository: [basis_spectra](https://drive.google.com/drive/folders/11gPncUy8xFtw-FVydwUHyLua1wIMsjWB?usp=drive_link) (a permanent data repository will be available soon)
-`pah_spec.PahSpec` requires that the basis_spectra folder can be found in the data folder of this repository.
+Temporary data repository: [basis_spectra](https://drive.google.com/drive/folders/11gPncUy8xFtw-FVydwUHyLua1wIMsjWB?usp=drive_link) (a permanent data repository will be available soon). `pah_spec.PahSpec` requires that the basis_spectra folder can be found in the data folder of this repository.
