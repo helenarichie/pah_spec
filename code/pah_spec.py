@@ -66,7 +66,7 @@ class PahSpec:
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion; Draine et al. 2021)
         # _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(script_path)
 
-        def size_car(B1, B2, rad):
+        def size_car(rad):
             # From Hensley & Draine (2023)
             B1 = 7.52e-7
             B2 = 8.09e-10
