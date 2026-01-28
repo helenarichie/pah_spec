@@ -22,6 +22,12 @@ GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04,
 
 _DELTA_LAMBDA = 0.01
 
+_THETA_OP_CC = 863 * u.K  # C-C out-of-plane bending mode Debye temperature
+_THETA_IP_CC = 2500 * u.K  # C-C in-plane bending mode Debye temperature
+_THETA_OP_CH = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
+_THETA_IP_CH = 1670 * u.K  # C-H in-plane bending mode Debye temperature
+_THETA_STR_CH = 4360 * u.K  # C-H stretching mode Debye temperature
+
 
 class PahSpec:
 
@@ -428,15 +434,16 @@ def calc_pah_energy(grain_radius, temp_arr):
     # 5 types of vibration: out-of-plane C-C modes, in-plane C-C modes, out-of-plane C-H bending, in-plane C-H bending, and C-H stretching.
     nc = _calc_nc(grain_radius)  # number of carbon atoms
     nh = _calc_nh(nc)  # number of hydrogen atoms
+    # TODO: consider turning these into functions
     nm_cc_op = nc - 2  # total number of C-C out-of-plane modes
     nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
 
-    # TODO: consider moving out of function and naming as constants _THETA_OP_CC
-    theta_op_cc = 863 * u.K  # C-C out-of-plane bending mode Debye temperature
-    theta_ip_cc = 2500 * u.K  # C-C in-plane bending mode Debye temperature
-    theta_op_ch = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
-    theta_ip_ch = 1670 * u.K  # C-H in-plane bending mode Debye temperature
-    theta_str_ch = 4360 * u.K  # C-H stretching mode Debye temperature
+    # TODO: consider moving out of function and naming as constants __THETA_OP_CC
+    # _THETA_OP_CC = 863 * u.K  # C-C out-of-plane bending mode Debye temperature
+    # _THETA_IP_CC = 2500 * u.K  # C-C in-plane bending mode Debye temperature
+    # _THETA_OP_CH = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
+    # _THETA_IP_CH = 1670 * u.K  # C-H in-plane bending mode Debye temperature
+    # _THETA_STR_CH = 4360 * u.K  # C-H stretching mode Debye temperature
 
     # determines if grain energy will be calculated using Debye spectrum method or discrete mode method
     nc_cutoff = 7360
@@ -444,23 +451,17 @@ def calc_pah_energy(grain_radius, temp_arr):
     # For grains with more carbon atoms than nc_cutoff, calculate C-C energies using the Debye spectrum approximation
     # Eq. 33 of Draine & Li (2001)
     if nc > nc_cutoff:
-        energy_arr = _calc_pah_energy_debye(
-            temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
-        )
+        energy_arr = _calc_pah_energy_debye(temp_arr, nh, nm_cc_ip, nm_cc_op)
 
     # For grains with fewer carbon atoms than nc_cutoff, calculate energies by summing contributions from individual modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
-        energy_arr = _calc_pah_energy_modes(
-            temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
-        )
+        energy_arr = _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op)
 
     return energy_arr
 
 
-def _calc_pah_energy_debye(
-    temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
-):
+def _calc_pah_energy_debye(temp_arr, nh, nm_cc_ip, nm_cc_op):
     """Calculate PAH energy using eq. 33 of Draine & Li (2001).
 
     Parameters
@@ -473,16 +474,6 @@ def _calc_pah_energy_debye(
         Number of C-C out-of-plane stretching modes
     nh : int
         Number of hydrogen atoms
-    theta_ip_cc : astropy.units.Quantity (float)
-        C-C in-plane bending mode Debye temperature
-    theta_op_cc : astropy.units.Quantity (float)
-        C-C out-of-plane bending mode Debye temperature
-    theta_ip_ch : astropy.units.Quantity (float)
-        C-H in-plane bending mode Debye temperature
-    theta_op_ch : astropy.units.Quantity (float)
-        C-H out-of-plane bending mode Debye temperature
-    theta_str_ch : astropy.units.Quantity (float)
-        C-H stretching mode Debye temperature
 
     Returns
     -------
@@ -497,30 +488,25 @@ def _calc_pah_energy_debye(
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     _check_param(temp_arr, u.K, iterable=True)
-    _check_param(theta_ip_cc, u.K)
-    _check_param(theta_op_cc, u.K)
-    _check_param(theta_ip_ch, u.K)
-    _check_param(theta_op_ch, u.K)
-    _check_param(theta_str_ch, u.K)
 
     # contributions from individual C-H modes, as implemented in lines 157-181 of pah_spec_heat.f
     energy_ch = np.zeros(len(temp_arr)) * u.erg
 
-    x = theta_op_ch / temp_arr
+    x = _THETA_OP_CH / temp_arr
     y = exp(x)
     tmin = 32 * u.K
     energy_ch[temp_arr > tmin] += (
         nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
 
-    x = theta_ip_ch / temp_arr
+    x = _THETA_IP_CH / temp_arr
     y = exp(x)
     tmin = 42 * u.K
     energy_ch[temp_arr > tmin] += (
         nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
 
-    x = theta_str_ch / temp_arr
+    x = _THETA_STR_CH / temp_arr
     y = exp(x)
     tmin = 109 * u.K
     energy_ch[temp_arr > tmin] += (
@@ -529,10 +515,10 @@ def _calc_pah_energy_debye(
 
     # contributions from C-C modes (approximated as Debye spectrum)
     energy_cc_op = np.zeros(len(temp_arr)) * u.erg
-    energy_cc_op += _debye_2(theta_op_cc / temp_arr) * k_B.cgs * temp_arr
+    energy_cc_op += _debye_2(_THETA_OP_CC / temp_arr) * k_B.cgs * temp_arr
 
     energy_cc_ip = np.zeros(len(temp_arr)) * u.erg
-    energy_cc_ip += _debye_2(theta_ip_cc / temp_arr) * k_B.cgs * temp_arr
+    energy_cc_ip += _debye_2(_THETA_IP_CC / temp_arr) * k_B.cgs * temp_arr
 
     # total energy
     energy_arr = energy_ch + nm_cc_op * energy_cc_op + nm_cc_ip * energy_cc_ip
@@ -540,9 +526,7 @@ def _calc_pah_energy_debye(
     return energy_arr
 
 
-def _calc_pah_energy_modes(
-    temp_arr, nc, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
-):
+def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=False):
     """Calculate PAH energy using eq. 2 of Draine & Li (2001).
 
     Parameters
@@ -557,16 +541,8 @@ def _calc_pah_energy_modes(
         Number of C-C in-plane stretching modes
     nm_cc_op : int
         Number of C-C out-of-plane stretching modes
-    theta_ip_cc : astropy.units.Quantity (float)
-        C-C in-plane bending mode Debye temperature
-    theta_op_cc : astropy.units.Quantity (float)
-        C-C out-of-plane bending mode Debye temperature
-    theta_ip_ch : astropy.units.Quantity (float)
-        C-H in-plane bending mode Debye temperature
-    theta_op_ch : astropy.units.Quantity (float)
-        C-H out-of-plane bending mode Debye temperature
-    theta_str_ch : astropy.units.Quantity (float)
-        C-H stretching mode Debye temperature
+    return_modes : bool, optional
+        Whether to return the array of pah mode energies
 
     Returns
     -------
@@ -581,17 +557,14 @@ def _calc_pah_energy_modes(
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     _check_param(temp_arr, u.K, iterable=True)
-    _check_param(theta_ip_cc, u.K)
-    _check_param(theta_op_cc, u.K)
-    _check_param(theta_ip_ch, u.K)
-    _check_param(theta_op_ch, u.K)
-    _check_param(theta_str_ch, u.K)
 
-    mode_arr_cc_op = _calc_cc_mode_energies(nc, nm_cc_op, theta_op_cc)
-    mode_arr_cc_ip = _calc_cc_mode_energies(nc, nm_cc_ip, theta_ip_cc)
-    mode_arr_ch_op = _calc_ch_mode_energies(nh, theta_op_ch)
-    mode_arr_ch_ip = _calc_ch_mode_energies(nh, theta_ip_ch)
-    mode_arr_ch_str = _calc_ch_mode_energies(nh, theta_str_ch)
+    # TODO: consider creating a function specifically for the calculation of the vibrational mode energies and removing
+    # the return_modes argument
+    mode_arr_cc_op = _calc_cc_mode_energies(nc, nm_cc_op, _THETA_OP_CC)
+    mode_arr_cc_ip = _calc_cc_mode_energies(nc, nm_cc_ip, _THETA_IP_CC)
+    mode_arr_ch_op = _calc_ch_mode_energies(nh, _THETA_OP_CH)
+    mode_arr_ch_ip = _calc_ch_mode_energies(nh, _THETA_IP_CH)
+    mode_arr_ch_str = _calc_ch_mode_energies(nh, _THETA_STR_CH)
 
     emode_arr = (
         sorted(
@@ -614,7 +587,10 @@ def _calc_pah_energy_modes(
         y = exp(x)
         energy_arr[x < exp_cutoff] += (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1)) * k_B.cgs * temp_arr[x < exp_cutoff]
 
-    return energy_arr
+    if return_modes:
+        return energy_arr, emode_arr
+    else:
+        return energy_arr
 
 
 def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
@@ -697,11 +673,167 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
-def _calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
+def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
+    """Calculate the temperature evolution of a PAH following a single-photon absorption.
+
+    Parameters
+    ----------
+    lambda_abs : astropy.units.Quantity (float)
+        Wavelength of absorbed photon
+    grain_radius : astropy.units.Quantity (float)
+        Dust grain radius
+    wavelength_arr : astropy.units.Quantity (array_like)
+        Emission wavelengths to integrate over
+    c_abs_arr : astropy.units.Quantity (array_like)
+        Array of length len(wavelength_arr) with C_abs values for a grain of size grain_radius
+    temp_arr : astropy.units.Quantity (array_like)
+        Array of temperatures corresponding to PAH vibrational energies for a grain of size grain_radius
+    energy_arr : astropy.units.Quantity (array_like)
+        Array of PAH vibrational energies as a function of temperature for a grain of size grain_radius
+
+    Returns
+    -------
+    dt_arr_out : astropy.units.Quantity (array_like)
+        Array of time-steps used to solve for T(t) (in u.s)
+    time_arr_out : astropy.units.Quantity (array_like)
+        Array with time values for T(t) (in u.s)
+    temp_arr_out : astropy.units.Quantity (array_like)
+        Array with temperature values for T(t) (in u.K)
+
+    Raises
+    ------
+    AttributeError
+        If the input is not an astropy.units.Quantity object
+    TypeError
+        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+    """
+    wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = u.um, u.AA, u.cm**2, u.erg, u.K
+    _check_param(lambda_abs, wavelength_unit)
+    _check_param(grain_radius, radius_unit)
+    _check_param(wavelength_arr, wavelength_unit, iterable=True)
+    _check_param(c_abs_arr, c_abs_unit, iterable=True)
+    _check_param(energy_arr, energy_unit, iterable=True)
+    _check_param(temp_arr, temp_unit, iterable=True)
+
+    nu_arr = c.cgs / wavelength_arr.to(u.cm)
+
+    energy_abs = c.cgs * h.cgs / lambda_abs.to(u.cm)
+    temp_abs = np.interp(energy_abs.value, energy_arr.value, temp_arr.value) * u.K
+
+    print(f"Photon wavelength: {lambda_abs:.2f}, initial temperature: {temp_abs:.2f}")
+
+    time_i, energy_i, temp_i = 0 * u.s, energy_abs, temp_abs
+    time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_i.value], []
+    dt_unit, time_unit, temp_unit = None, None, None
+    # The change in energy per timestep, results are converged for dE < 3%
+    dE_max = 0.03
+
+    nc = _calc_nc(grain_radius)
+    nh = _calc_nh(nc)
+    na = nc + nh  # the total number of atoms
+    nm = 3 * (na - 2)  # the total number of vibrational modes
+    # TODO: consider implementing these as functions
+    nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energies
+    nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
+    _, pah_energy_modes = _calc_pah_energy_modes(temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True)
+
+
+    # Define first 10 energy bins following method in DL01 Appendix B
+    energy_j_min = np.zeros(10) * u.erg
+    energy_j_max = np.zeros(10) * u.erg
+
+    # j is offset by -1 from DL01 Appendix B since we are using zero-based indexing
+    # Eq. B1
+    j = 0
+    energy_j_min[j] = 3 / 2 * pah_energy_modes[j] - 1 / 2 * pah_energy_modes[j+1]
+    
+    # Eq. B2
+    for j in range(0, 2):
+        bin_edge = 1 / 2 * (pah_energy_modes[j] + pah_energy_modes[j+1])
+        energy_j_max[j] = bin_edge
+        energy_j_min[j+1] = bin_edge
+    
+    # Eq. B3
+    for j in range(2, 10):
+        bin_edge = 1 / 2 * (pah_energy_modes[2 * j - 2] + pah_energy_modes[2 * j - 1])
+        energy_j_max[j] = bin_edge
+        if j != 9:
+            energy_j_min[j+1] = bin_edge
+
+
+    # Cache variables outside of loop to modify the final temperature bin before manually implementing temperature bins
+    dE, dt, dE_dt = None, None, None
+    while energy_i > energy_j_max[-1]:
+        dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
+
+        dt = dE_max * energy_i / dE_dt
+        dE = dE_dt * dt
+
+        energy_i -= dE
+        time_i += dt
+
+        temp_i = np.interp(energy_i.value, energy_arr.value, temp_arr.value) * u.K
+
+        dt_arr_out.append(dt.value)
+        time_arr_out.append(time_i.value)
+        temp_arr_out.append(temp_i.value)
+        dt_unit, time_unit, temp_unit = dt.unit, time_i.unit, temp_i.unit
+
+    # Ensure that the final temperature bin lines up with the pre-defined energy bins 
+    # Undo the final timestep
+    energy_i += dE
+    time_i -= dt
+
+    # Calculate the intended timestep
+    dE_correction = energy_i - energy_j_max[-1]
+    dt_correction = dE_correction / dE_dt
+
+    # Apply the correction
+    energy_i -= dE_correction  # should line up with energy_j_max[-1]
+    time_i += dt_correction
+
+    # Overwrite the final values
+    dt_arr_out[-1] = dt_correction.value
+    time_arr_out[-1] = time_i.value
+    temp_arr_out[-1] = np.interp(energy_i.value, energy_arr.value, temp_arr.value)
+
+    print(energy_i, energy_j_max[-1])
+
+    for j in range(9, -1, -1):
+        # print("in second loop: ", temp_i)
+        dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
+
+        dE = energy_j_max[j] - energy_j_min[j]
+
+        energy_i -= dE
+
+        dt = energy_i / dE_dt
+
+        time_i += dt
+
+        temp_i = np.interp(energy_i.value, energy_arr.value, temp_arr.value) * u.K
+
+        dt_arr_out.append(dt.value)
+        time_arr_out.append(time_i.value)
+        temp_arr_out.append(temp_i.value)
+        dt_unit, time_unit, temp_unit = dt.unit, time_i.unit, temp_i.unit
+
+    dt_arr_out = np.array(dt_arr_out) * dt_unit
+    time_arr_out = np.array(time_arr_out) * time_unit
+    temp_arr_out = np.array(temp_arr_out) * temp_unit
+
+    print(f"Final temperature of {temp_arr_out[-1]:.2f} at time {time_arr_out[-1]:.2e}")
+
+    return dt_arr_out, time_arr_out, temp_arr_out
+
+
+def _calc_basis_vector(grain_size, lambda_abs, wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
     """Calculate the basis vector for a single-photon absorption.
 
     Parameters
     ----------
+    lambda_abs : astropy.units.Quantity (float)
+        Wavelength of absorbed photon
     wavelength_arr : astropy.units.Quantity (array_like)
         Array of emission wavelengths
     weighting_arr : array_like
@@ -724,6 +856,7 @@ def _calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     wavelength_unit, temp_unit, c_abs_unit = u.um, u.K, u.cm**2
+    _check_param(lambda_abs, wavelength_unit)
     _check_param(wavelength_arr, wavelength_unit, iterable=True)
     _check_param(temp_arr, temp_unit, iterable=True)
     _check_param(c_abs_arr, c_abs_unit, iterable=True)
@@ -731,11 +864,24 @@ def _calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
 
     unit = None
 
+    energy_arr = calc_pah_energy(grain_radius=grain_size, temp_arr=temp_arr)
+    weights = np.ones(len(energy_arr))
+
+    # weights[energy_arr > h.cgs * c.cgs / lambda_abs.to(u.cm)] = 0
+    # print(np.amin(energy_arr), np.amax(energy_arr))
+    # print(h.cgs * c.cgs / lambda_abs.to(u.cm))
+    
     basis_vector = np.zeros(len(wavelength_arr))
     for i, lambda_i in enumerate(wavelength_arr.to(u.cm)):
-        p_lambda_i = np.sum(4 * np.pi * _planck_function_lambd(lambda_i.to(u.cm), temp_arr) * weighting_arr * c_abs_arr[i])
+        weights = np.ones(len(energy_arr))
+        weights[energy_arr < h.cgs * c.cgs / lambda_i.to(u.cm)] = 0
+        p_lambda_i = np.sum(4 * np.pi * _planck_function_lambd(lambda_i.to(u.cm), temp_arr) * weights * weighting_arr * c_abs_arr[i])
         unit = p_lambda_i.unit
         basis_vector[i] = p_lambda_i.value
+
+    # Apply condition in Eq. 56  of DL01 restricting emission to wavelengths of lambda_abs > lambda
+    # basis_vector[wavelength_arr > lambda_abs] = 0
+    # print("Total zeros: ", np.sum(basis_vector == 0))
 
     return basis_vector * unit
 
@@ -745,7 +891,7 @@ def _compute_basis_spectrum(lambda_abs, grain_size, emission_wavelengths, c_abs_
     temp_arr_t = temp_arr_t[0:-1]  # make array same length as weighting array
     temp_weights = dt_arr / np.sum(dt_arr)
 
-    return _calc_basis_vector(emission_wavelengths, temp_weights, temp_arr_t, c_abs_arr)
+    return _calc_basis_vector(grain_size, lambda_abs, emission_wavelengths, temp_weights, temp_arr_t, c_abs_arr)
 
 
 def _calc_nh(nc):
