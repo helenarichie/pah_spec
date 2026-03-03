@@ -8,7 +8,6 @@ import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
-
 GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04, 
  4.7315e-04, 5.0119e-04, 5.3088e-04, 5.6234e-04, 5.9566e-04, 6.3096e-04, 
  6.6834e-04, 7.0795e-04, 7.4989e-04, 7.9433e-04, 8.4140e-04, 8.9125e-04, 
@@ -175,18 +174,21 @@ class PahSpec:
                 c_abs = self.calc_c_abs(emission_wavelengths, grain_radius)[0][0]
                 print(f"C_abs computed for PAH+ of size {grain_radius:.2f}")
             
-            # TODO: test this definition of the temperature array
             temp_arr = np.linspace(0, 5e3, 10000) * u.K
             energy_arr = calc_pah_energy(grain_radius, temp_arr)
 
+            # Get the PAH fundmanetal mode energies (in order of increasing energy)
+            nc = _calc_nc(grain_radius)
+            nh = _calc_nh(nc)
+            nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energies
+            nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
+            _, pah_energy_modes = _calc_pah_energy_modes(temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True)
+
             basis_dict = dict()
-
+     
             for i, lambda_abs in enumerate(photon_wavelengths):
-                if not ion:
-                    basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr)
-                else:
-                    basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr)
-
+                basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr, pah_energy_modes)
+    
             df = pd.DataFrame(basis_dict)
             if not ion:
                 df.to_pickle(os.path.join(output_directory, f"basis_neu_{grain_radius.to(u.AA).value:.3f}.pkl"))
@@ -672,7 +674,7 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
-def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
+def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr, pah_energy_modes):
     """Calculate the temperature evolution of a PAH following a single-photon absorption.
 
     Parameters
@@ -689,6 +691,8 @@ def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_a
         Array of temperatures corresponding to PAH vibrational energies for a grain of size grain_radius
     energy_arr : astropy.units.Quantity (array_like)
         Array of PAH vibrational energies as a function of temperature for a grain of size grain_radius
+    pah_energy_modes : astropy.units.Quantity (array_like)
+        Array of PAH fundamental mode energies for a grain of size grain_radius
 
     Returns
     -------
@@ -726,15 +730,6 @@ def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_a
     dt_unit, time_unit, temp_unit = None, None, None
     # The change in energy per timestep, results are converged for dE < 3%
     dE_max = 0.03
-
-    nc = _calc_nc(grain_radius)
-    nh = _calc_nh(nc)
-    na = nc + nh  # the total number of atoms
-    nm = 3 * (na - 2)  # the total number of vibrational modes
-    # TODO: consider implementing these as functions
-    nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energies
-    nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
-    _, pah_energy_modes = _calc_pah_energy_modes(temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True)
 
     # Define first 10 energy bins following method in DL01 Appendix B
     nbins = 10
@@ -816,6 +811,9 @@ def _calc_pah_cooling_discrete(lambda_abs, grain_radius, wavelength_arr, c_abs_a
 
         dt_unit, time_unit, temp_unit = dt.unit, time_i.unit, temp_i.unit
 
+    # ensure that zero energy corresponds to zero temperature (np.interp sometimes returns nonzero/NaN values)
+    temp_arr_out[-1] = 0
+
     dt_arr_out = np.array(dt_arr_out) * dt_unit
     time_arr_out = np.array(time_arr_out) * time_unit
     temp_arr_out = np.array(temp_arr_out) * temp_unit
@@ -878,8 +876,8 @@ def _calc_basis_vector(grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weig
     return basis_vector * unit
 
 
-def _compute_basis_spectrum(lambda_abs, grain_radius, emission_wavelengths, c_abs_arr, temp_arr, energy_arr):
-    dt_arr, time_arr, temp_arr_t = _calc_pah_cooling_discrete(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr)
+def _compute_basis_spectrum(lambda_abs, grain_radius, emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes):
+    dt_arr, time_arr, temp_arr_t = _calc_pah_cooling_discrete(lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes)
     temp_arr_t = temp_arr_t[0:-1]  # temperatures of the top edges of each energy bin
     temp_weights = dt_arr / np.sum(dt_arr)
 
