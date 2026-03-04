@@ -272,6 +272,15 @@ class PahSpec:
             temp_arr = np.linspace(0, 5e3, 10000) * u.K
             energy_arr = calc_pah_energy(grain_radius, temp_arr)
 
+            # Get the PAH fundmanetal mode energies (in order of increasing energy)
+            nc = _calc_nc(grain_radius)
+            nh = _calc_nh(nc)
+            nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energies
+            nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
+            _, pah_energy_modes = _calc_pah_energy_modes(
+                temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True
+            )
+
             basis_dict = {}
 
             for lambda_abs in photon_wavelengths:
@@ -754,8 +763,8 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
 
     if return_modes:
         return energy_arr, emode_arr
-    else:
-        return energy_arr
+
+    return energy_arr
 
 
 def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
