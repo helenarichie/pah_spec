@@ -266,11 +266,11 @@ class PahSpec:
                 c_abs = self.calc_c_abs(emission_wavelengths, grain_radius)[1][0]
                 print(f"C_abs computed for PAH0 of size {grain_radius:.2f}")
             else:
-                c_abs = self.calc_c_abs(emission_wavelengths, grain_size)[0][0]
-                print(f"C_abs computed for PAH+ of size {grain_size:.2f}")
+                c_abs = self.calc_c_abs(emission_wavelengths, grain_radius)[0][0]
+                print(f"C_abs computed for PAH+ of size {grain_radius:.2f}")
 
             temp_arr = np.linspace(0, 5e3, 10000) * u.K
-            energy_arr = calc_pah_energy(grain_size, temp_arr)
+            energy_arr = calc_pah_energy(grain_radius, temp_arr)
 
             basis_dict = {}
 
