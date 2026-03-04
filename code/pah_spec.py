@@ -1,29 +1,30 @@
+import os
 from astropy.constants import c, h, k_B
 from astropy.io import fits
 import astropy.units as u
 import numpy as np
 from numpy import exp
-import os
 import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
 
-GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04, 
- 4.7315e-04, 5.0119e-04, 5.3088e-04, 5.6234e-04, 5.9566e-04, 6.3096e-04, 
- 6.6834e-04, 7.0795e-04, 7.4989e-04, 7.9433e-04, 8.4140e-04, 8.9125e-04, 
- 9.4406e-04, 1.0000e-03, 1.0593e-03, 1.1220e-03, 1.1885e-03, 1.2589e-03, 
- 1.3335e-03, 1.4125e-03, 1.4962e-03, 1.5849e-03, 1.6788e-03, 1.7783e-03, 
- 1.8836e-03, 1.9953e-03, 2.1135e-03, 2.2387e-03, 2.3714e-03, 2.5119e-03, 
- 2.6607e-03, 2.8184e-03, 2.9854e-03, 3.1623e-03, 3.3497e-03, 3.5481e-03, 
- 3.7584e-03, 3.9811e-03, 4.2170e-03, 4.4668e-03, 4.7315e-03, 5.0119e-03, 
- 5.3088e-03, 5.6234e-03, 5.9566e-03, 6.3096e-03, 6.683E-03, 7.079E-03, 
+GRAIN_SIZES = [3.5481e-04, 3.7584e-04, 3.9811e-04, 4.2170e-04, 4.4668e-04,
+ 4.7315e-04, 5.0119e-04, 5.3088e-04, 5.6234e-04, 5.9566e-04, 6.3096e-04,
+ 6.6834e-04, 7.0795e-04, 7.4989e-04, 7.9433e-04, 8.4140e-04, 8.9125e-04,
+ 9.4406e-04, 1.0000e-03, 1.0593e-03, 1.1220e-03, 1.1885e-03, 1.2589e-03,
+ 1.3335e-03, 1.4125e-03, 1.4962e-03, 1.5849e-03, 1.6788e-03, 1.7783e-03,
+ 1.8836e-03, 1.9953e-03, 2.1135e-03, 2.2387e-03, 2.3714e-03, 2.5119e-03,
+ 2.6607e-03, 2.8184e-03, 2.9854e-03, 3.1623e-03, 3.3497e-03, 3.5481e-03,
+ 3.7584e-03, 3.9811e-03, 4.2170e-03, 4.4668e-03, 4.7315e-03, 5.0119e-03,
+ 5.3088e-03, 5.6234e-03, 5.9566e-03, 6.3096e-03, 6.683E-03, 7.079E-03,
  7.499E-03, 7.943E-03, 8.414E-03, 8.913E-03, 9.441E-03, 1.00E-02] * u.um
 
 _DELTA_LAMBDA = 0.01
 
 
 class PahSpec:
+    """Class for generating PAH emission spectra with the single photon approximation"""
 
     def __init__(self, basis_directory="../data/basis_spectra", c_abs_data_directory="../data/c_abs_data"):
         # Path of pah_spec.py
@@ -31,13 +32,13 @@ class PahSpec:
 
         # Check if the cross section path exists
         if not os.path.exists(os.path.join(script_path, c_abs_data_directory)):
-          raise FileNotFoundError(
-            f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {c_abs_data_directory}, but the path does not exist"
+            raise FileNotFoundError(
+                f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {c_abs_data_directory}, but the path does not exist"
         )
         # Check if the basis spectra path exists
         if not os.path.exists(os.path.join(script_path, basis_directory)):
-          raise FileNotFoundError(
-            f"Exptected to find basis spectra at {basis_directory}, but the path does not exist"
+            raise FileNotFoundError(
+                f"Exptected to find basis spectra at {basis_directory}, but the path does not exist"
         )
 
         # Load the basis spectra into memory
@@ -60,7 +61,8 @@ class PahSpec:
         cabs_graphite = hdul[3].data*u.cm**2
         self.cabs_graphite_spl = interpolate.RectBivariateSpline(rad_graphite.value, wav_graphite.value, cabs_graphite.value)
 
-        # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion; Draine et al. 2021)
+        # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
+        # Draine et al. 2021)
         _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(script_path)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
@@ -84,9 +86,11 @@ class PahSpec:
         Returns
         -------
         spectrum_neu : astropy.units.Quantity (array_like)
-            PAH0 size- and ionization-integrated spectrum for grains heated by the input u_lambda (in u.erg / (u.cm * u.s))
+            PAH0 size- and ionization-integrated spectrum for grains heated by the input u_lambda 
+            (in u.erg / (u.cm * u.s))
         spectrum_ion : astropy.units.Quantity (array_like)
-            PAH+ size- and ionization-integrated spectrum for grains heated by the input u_lambda (in u.erg / (u.cm * u.s))
+            PAH+ size- and ionization-integrated spectrum for grains heated by the input u_lambda 
+            (in u.erg / (u.cm * u.s))
 
         Raises
         ------
@@ -118,7 +122,7 @@ class PahSpec:
         spectrum_ion = _size_integrate(spectra_ion_a, size_dist_ion)
 
         return spectrum_neu, spectrum_ion
-    
+
 
     def generate_basis_spectra(self, grain_sizes, emission_wavelengths, output_directory="./", ion=False, lambda_min=0.0912*u.um, lambda_max=10*u.um):
         """Generates basis spectra file for input grain sizes for an ionized or neutral PAHs.
@@ -170,13 +174,13 @@ class PahSpec:
             else:
                 c_abs = self.calc_c_abs(emission_wavelengths, grain_size)[0][0]
                 print(f"C_abs computed for PAH+ of size {grain_size:.2f}")
-            
+
             temp_arr = np.linspace(1, 5e3, 10000) * u.K
             energy_arr = calc_pah_energy(grain_size, temp_arr)
 
             basis_dict = dict()
 
-            for i, lambda_abs in enumerate(photon_wavelengths):
+            for lambda_abs in photon_wavelengths:
                 if not ion:
                     basis_dict[str(lambda_abs.value)] = _compute_basis_spectrum(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs, temp_arr, energy_arr)
                 else:
@@ -190,16 +194,18 @@ class PahSpec:
 
         photon_wavelengths = [s.value for s in photon_wavelengths]
         emission_wavelengths = [s.value for s in emission_wavelengths]
-        
-        data = dict()
+
+        data = {}
         data["lambda_em [um]"] = emission_wavelengths
         df = pd.DataFrame(data)
         df.to_csv(os.path.join(output_directory, "lambda_em.csv"), index=False)
 
-        data = dict()
+        data = {}
         data["lambda_abs [um]"] = photon_wavelengths
         df = pd.DataFrame(data)
         df.to_csv(os.path.join(output_directory, "lambda_abs.csv"), index=False)
+
+        return None
 
 
     def calc_c_abs(self, wavelength_arr, radius_arr):
@@ -236,26 +242,26 @@ class PahSpec:
         radius_arr = _check_param(radius_arr, radius_unit, force_iterable=True)
 
         nc = _calc_nc(radius_arr)
-        HC = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07 # Note that this is from Equation 4 of DL07
-        HC[(nc >= 25) & (nc <= 100)] = 0.5*np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
-        HC[nc > 100] = 0.25
+        hc = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07 # Note that this is from Equation 4 of DL07
+        hc[(nc >= 25) & (nc <= 100)] = 0.5*np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
+        hc[nc > 100] = 0.25
         xi_gra = np.zeros_like(radius_arr.value)
         xi_gra[radius_arr < 50 * u.AA] = 0.01
         xi_gra[radius_arr >= 50 * u.AA] = 0.01 + 0.99 * (1. - (50 * u.AA / radius_arr[radius_arr >= 50 * u.AA]) ** 3)
 
-        def S_func(lam, lamj, gamma, sigma):
+        def s_func(lam, lamj, gamma, sigma):
             num = 2*gamma*lamj*sigma
             denom = np.pi*( ((lam/lamj) - (lamj/lam))**2 + gamma**2)
             return num/denom
         
-        def C_func(y):
+        def c_func(y):
             return np.arctan(1.e3*(y-1.)**3/y)/np.pi + 0.5
         
         # Cutoff function parameters
-        M_ring = 0.3 * nc
-        M_ring[nc > 40] = 0.4 * nc[nc > 40]
-        lamc_neu = 0.951 * u.um / (1. + 3.616 / np.sqrt(M_ring))
-        lamc_ion = 1.125 * u.um / (1. + 2.567 / np.sqrt(M_ring))
+        m_ring = 0.3 * nc
+        m_ring[nc > 40] = 0.4 * nc[nc > 40]
+        lamc_neu = 0.951 * u.um / (1. + 3.616 / np.sqrt(m_ring))
+        lamc_ion = 1.125 * u.um / (1. + 2.567 / np.sqrt(m_ring))
 
         x = (1. * u.um / wavelength_arr).value
         c_abs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
@@ -267,21 +273,21 @@ class PahSpec:
             c_abs_neu_out[i, :] += xi_gra[i]*graph_cont
 
             # PAH contribution
-            C_fac_neu = C_func((wavelength_arr/lamc_neu[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
-            C_fac_ion = C_func((wavelength_arr/lamc_ion[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
-            S_mat_neu = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
-            S_mat_ion = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
+            c_fac_neu = c_func((wavelength_arr/lamc_neu[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
+            c_fac_ion = c_func((wavelength_arr/lamc_ion[i]).value**-1) # Note error in Equation A7, should be C(lambda_c/lambda)
+            s_mat_neu = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
+            s_mat_ion = np.zeros( (len(self.lamj_tab), len(wavelength_arr)) )*u.cm**2
             for j in range(len(self.lamj_tab)):
                 if(self.hc_tab[j] == 0):
-                    S_mat_neu[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j])
-                    S_mat_ion[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j])
+                    s_mat_neu[j,:] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j])
+                    s_mat_ion[j,:] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j])
                 else:
-                    S_mat_neu[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j]*HC[i])
-                    S_mat_ion[j,:] = S_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j]*HC[i])
+                    s_mat_neu[j,:] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j]*hc[i])
+                    s_mat_ion[j,:] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j]*hc[i])
 
             idx = np.where((10 < x) & (x < 15))
-            c_abs_ion_out[i, idx] += (S_mat_ion[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
-            c_abs_neu_out[i, idx] += (S_mat_neu[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
+            c_abs_ion_out[i, idx] += (s_mat_ion[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (s_mat_neu[0,idx] + (1.35*x[idx]-3.)*1.e-18*u.cm**2)*nc[i]*(1.-xi_gra[i])
 
             idx = np.where((7.7 < x) & (x <= 10))
             c_abs_ion_out[i, idx] += (66.302 - 24.367*x[idx] + 2.950*x[idx]**2 - 0.1057*x[idx]**3)*1.e-18*u.cm**2*nc[i]*(1.-xi_gra[i])
@@ -292,21 +298,21 @@ class PahSpec:
             c1 = 1.905e-19*u.cm**2
             c2 = 4.175e-19*u.cm**2
             c3 = 4.37e-20*u.cm**2 # Note Equations A11 and A12 are mislabeled
-            c_abs_ion_out[i, idx] += (S_mat_ion[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
-            c_abs_neu_out[i, idx] += (S_mat_neu[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
+            c_abs_ion_out[i, idx] += (s_mat_ion[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (s_mat_neu[1,idx] + c0 + c1*x[idx] + c2*(x[idx]-5.9)**2 + c3*(x[idx]-5.9)**3)*nc[i]*(1.-xi_gra[i])
 
             idx = np.where((3.3 < x) & (x <= 5.9))
-            c_abs_ion_out[i, idx] += (S_mat_ion[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
-            c_abs_neu_out[i, idx] += (S_mat_neu[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
+            c_abs_ion_out[i, idx] += (s_mat_ion[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += (s_mat_neu[1,idx] + c0 + c1*x[idx])*nc[i]*(1.-xi_gra[i])
 
             idx = np.where(x <= 3.3)
-            c_abs_ion_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*C_fac_ion[idx]*nc[i]*(1.-xi_gra[i])
-            c_abs_neu_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*C_fac_neu[idx]*nc[i]*(1.-xi_gra[i])
+            c_abs_ion_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*c_fac_ion[idx]*nc[i]*(1.-xi_gra[i])
+            c_abs_neu_out[i, idx] += 34.58e-18*10**(-3.431/x[idx])*u.cm**2*c_fac_neu[idx]*nc[i]*(1.-xi_gra[i])
 
             for j in range(len(self.lamj_tab)):
                 if (j > 1):
-                    c_abs_ion_out[i, idx] += S_mat_ion[j,idx]*nc[i]*(1.-xi_gra[i])
-                    c_abs_neu_out[i, idx] += S_mat_neu[j,idx]*nc[i]*(1.-xi_gra[i])
+                    c_abs_ion_out[i, idx] += s_mat_ion[j,idx]*nc[i]*(1.-xi_gra[i])
+                    c_abs_neu_out[i, idx] += s_mat_neu[j,idx]*nc[i]*(1.-xi_gra[i])
 
             c_abs_ion_out[i, idx] += 3.5e-19*10**(-1.45/x[idx])*np.exp(-(0.1*x[idx])**2)*nc[i]*(1.-xi_gra[i])*u.cm**2 # Note: does not appear in D21+
 
@@ -441,6 +447,8 @@ def calc_pah_energy(grain_radius, temp_arr):
     # determines if grain energy will be calculated using Debye spectrum method or discrete mode method
     nc_cutoff = 7360
 
+    energy_arr = None
+
     # For grains with more carbon atoms than nc_cutoff, calculate C-C energies using the Debye spectrum approximation
     # Eq. 33 of Draine & Li (2001)
     if nc > nc_cutoff:
@@ -448,7 +456,8 @@ def calc_pah_energy(grain_radius, temp_arr):
             temp_arr, nh, nm_cc_ip, nm_cc_op, theta_ip_cc, theta_op_cc, theta_ip_ch, theta_op_ch, theta_str_ch
         )
 
-    # For grains with fewer carbon atoms than nc_cutoff, calculate energies by summing contributions from individual modes
+    # For grains with fewer carbon atoms than nc_cutoff, calculate energies by summing contributions from individual
+    # modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
         energy_arr = _calc_pah_energy_modes(
@@ -741,7 +750,7 @@ def _calc_basis_vector(wavelength_arr, weighting_arr, temp_arr, c_abs_arr):
 
 
 def _compute_basis_spectrum(lambda_abs, grain_size, emission_wavelengths, c_abs_arr, temp_arr, energy_arr):
-    dt_arr, time_arr, temp_arr_t = _calc_pah_cooling(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr)
+    dt_arr, _, temp_arr_t = _calc_pah_cooling(lambda_abs, grain_size.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr)
     temp_arr_t = temp_arr_t[0:-1]  # make array same length as weighting array
     temp_weights = dt_arr / np.sum(dt_arr)
 
@@ -752,10 +761,12 @@ def _calc_nh(nc):
     """Eq. 8 of Draine & Li (2001)"""
     if nc <= 25:
         return round(0.5 * nc + 0.5)
-    if (nc > 25) and (nc <= 100):
+    if nc > 25 and nc <= 100:
         return round(2.5 * np.sqrt(nc) + 0.5)
     if nc > 100:
         return round(0.25 * nc + 0.5)
+
+    return None
 
 
 def _calc_nc(a):
@@ -769,7 +780,7 @@ def _calc_delta_j(j):
     """Eq. 6 and 5 of Draine & Li (2001). Adjusts location of first 3 modes to bring agreement with mode spectrum of
     coronene C_{24}H_{12}.
     """
-    if (j == 2) or (j == 3):
+    if j == 2 or j == 3:
         return 1
     else:
         return 1 / 2
@@ -779,10 +790,12 @@ def _calc_beta(nc, nm):
     """Eq. 7 of Draine & Li (2001)"""
     if nc <= 54:
         return 0
-    elif (nc > 54) and (nc <= 102):
+    elif nc > 54 and nc <= 102:
         return (1 / (2 * nm - 1)) * ((nc - 54) / 52)
     elif nc > 102:
         return (1 / (2 * nm - 1)) * (((nc - 2) / 52) * (102 / nc) ** (2 / 3) - 1)
+
+    return None
 
 
 def _calc_cc_mode_energies(nc, nm, theta):
@@ -847,11 +860,13 @@ def _check_param(param, unit, iterable=False, force_iterable=False):
     if iterable:
         if not isinstance(param.value, (list, tuple, np.ndarray)):
             raise TypeError("expects array-like input")
-    
+
     if force_iterable:
         if not isinstance(param.value, (list, tuple, np.ndarray)):
             param = np.array([param.value]) * param.unit
         return param
+
+    return None
 
 
 def _planck_function_nu(nu, T):
@@ -883,7 +898,7 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
 
 def _read_basis_spectra_for_ionization(filename, dims):
     df = pd.read_pickle(filename)
-    
+
     basis_spectra_i = np.zeros((dims))
     for j, col in enumerate(df):
         basis_spectra_i[j] = df[col].to_numpy()
