@@ -275,7 +275,7 @@ class PahSpec:
             # Get the PAH fundmanetal mode energies (in order of increasing energy)
             nc = _calc_nc(grain_radius)
             nh = _calc_nh(nc)
-            nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energies
+            nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energy
             nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
             _, pah_energy_modes = _calc_pah_energy_modes(
                 temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True
@@ -1061,7 +1061,7 @@ def _calc_basis_vector(grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weig
 def _compute_basis_spectrum(
     lambda_abs, grain_radius, emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes
 ):
-    dt_arr, _, temp_arr_t = _calc_pah_cooling(
+    dt_arr, _, temp_arr_t = _calc_pah_cooling_discrete(
         lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes
     )
     temp_arr_t = temp_arr_t[0:-1]  # temperatures of the top edges of each energy bin
