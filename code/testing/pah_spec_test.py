@@ -3,11 +3,11 @@ from math import isclose
 import os
 import sys
 import unittest
-import requests
 import zipfile
 
 import astropy.units as u
 import numpy as np
+import requests
 
 from scipy.integrate import trapezoid
 
@@ -29,8 +29,8 @@ class PahSpecTest(unittest.TestCase):
     def setUpClass(cls):
 
         # Download and save data file before instantiating pah_spec
-        url = "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LUUXEJ#"
-        response = requests.get(url)
+        url = "https://dataverse.harvard.edu/api/access/dataset/:persistentId/?persistentId=doi:10.7910/DVN/LUUXEJ"
+        response = requests.get(url, allow_redirects=True)
         response.raise_for_status()
 
         extract_path = os.path.join(os.path.dirname(__file__), "../../data/basis_spectra")
