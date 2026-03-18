@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, "../")
-import pah_spec  # TODO: IMPORT THE LOCAL VERSION!!!!!!
+import pah_spec  # pylint: disable=wrong-import-position
 
 ps = pah_spec.PahSpec()
 spectrum_neu, spectrum_ion = ps.generate_spectrum()
