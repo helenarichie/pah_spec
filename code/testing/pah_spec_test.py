@@ -8,8 +8,8 @@ import numpy as np
 
 from scipy.integrate import trapezoid
 
-sys.path.insert(0, "../")
-import pah_spec  # TODO: IMPORT THE LOCAL VERSION!!!!!!
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../"))
+import pah_spec
 
 # Set tolerance for disagreement to 1%
 TOLERANCE = 0.01
