@@ -20,7 +20,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install astropy scipy numpy pandas scipy requests
+        run: pip install astropy numpy pandas pytest scipy requests
 
       - name: Run tests
-        run: python -m unittest discover -s code/testing -p "pah_spec_test.py"
+        run: pytest code/testing/pah_spec_test.py -v
