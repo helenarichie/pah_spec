@@ -29,7 +29,7 @@ class PahSpecTest(unittest.TestCase):
     def setUpClass(cls):
 
         # Download and save data file before instantiating pah_spec
-        url = "https://dataverse.harvard.edu/api/access/dataset/:persistentId/?persistentId=doi:10.7910/DVN/LUUXEJ"
+        url = "https://rserve.dataverse.harvard.edu/cgi-bin/zipdownload?037-cb7563eb9c53"
         response = requests.get(url, allow_redirects=True)
         response.raise_for_status()
 
