@@ -1,7 +1,10 @@
+import io
 from math import isclose
 import os
 import sys
 import unittest
+import requests
+import zipfile
 
 import astropy.units as u
 import numpy as np
@@ -24,6 +27,18 @@ class PahSpecTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+
+        # Download and save data file before instantiating pah_spec
+        url = "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LUUXEJ#"
+        response = requests.get(url)
+        response.raise_for_status()
+
+        extract_path = os.path.join(os.path.dirname(__file__), "../../data/basis_spectra")
+        os.makedirs(extract_path, exist_ok=True)
+
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+            zf.extractall(extract_path)
+
         test_dir = os.path.dirname(__file__)
         golden_path = os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv")
         goldens = np.loadtxt(golden_path, delimiter=",", skiprows=1)

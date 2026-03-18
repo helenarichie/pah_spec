@@ -1,6 +1,6 @@
-import astropy.units as u
-import numpy as np
 import sys
+
+import numpy as np
 
 sys.path.insert(0, "../")
 import pah_spec  # TODO: IMPORT THE LOCAL VERSION!!!!!!
