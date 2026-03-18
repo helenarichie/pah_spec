@@ -1,23 +1,32 @@
-import astropy.units as u
-import unittest
 from math import isclose
-import numpy as np
+import os
 import sys
+import unittest
+
+import astropy.units as u
+import numpy as np
+
+from scipy.integrate import trapezoid
 
 sys.path.insert(0, "../")
 import pah_spec  # TODO: IMPORT THE LOCAL VERSION!!!!!!
-from scipy.integrate import trapezoid
 
 # Set tolerance for disagreement to 1%
 TOLERANCE = 0.01
 
 
 class PahSpecTest(unittest.TestCase):
-    """Tests for the pah_spec module."""
+    """Tests for the pah_spec module.
+
+    unittest executes setUpClass to initialize the class attributes and executes any method
+    beginning with "test_" as a test.
+    """
 
     @classmethod
     def setUpClass(cls):
-        goldens = np.loadtxt("../../data/test_data/pah_spec_golden.csv", delimiter=",", skiprows=1)
+        test_dir = os.path.dirname(__file__)
+        golden_path = os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv")
+        goldens = np.loadtxt(golden_path, delimiter=",", skiprows=1)
         cls.golden_wavelength_arr = goldens[:, 0] * u.um
         cls.golden_spectrum_neu = goldens[:, 1] * u.erg / (u.cm * u.s)
         cls.golden_spectrum_ion = goldens[:, 2] * u.erg / (u.cm * u.s)
