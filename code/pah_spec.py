@@ -126,6 +126,7 @@ class PahSpec:
         self.cabs_graphite_spl = interpolate.RectBivariateSpline(
             rad_graphite.value, wav_graphite.value, cabs_graphite.value
         )
+        hdul.close()
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
