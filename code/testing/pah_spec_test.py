@@ -87,7 +87,7 @@ class PahSpecTest(unittest.TestCase):
             raise
 
 
-def compare_arrays(a: list[float], b: list[float]) -> str:
+def compare_arrays(a, b):
     """Check that each element of two input arrays are within an allowable percentage of each other."""
     if len(a) != len(b):
         raise ValueError("Arrays must be the same length")
