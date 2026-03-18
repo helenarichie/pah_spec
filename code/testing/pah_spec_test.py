@@ -12,7 +12,7 @@ import requests
 from scipy.integrate import trapezoid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../"))
-import pah_spec
+import pah_spec  # pylint: disable=wrong-import-position
 
 # Set tolerance for disagreement to 1%
 TOLERANCE = 0.01
