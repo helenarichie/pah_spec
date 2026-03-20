@@ -1,3 +1,18 @@
+"""
+pah_spec is a package for generating PAH emission spectra for arbitrary input radiation fields using the single photon
+approximation, as described in Richie & Hensley (2026).
+
+The primary functionality of pah_spec lies in the PahSpec class, which uses a pre-existing set of basis spectra to
+execute the generate_spectrum() method. This method takes a radiation field and dust grain size distributions as
+(optional) inputs and returns an emission spectrum for neutral and ionized PAHs.
+
+In addition to generating emission spectra, pah_spec contains useful functions for the PAH energy and absorption
+cross-sections (calc_pah_energy() and PahSpec.calc_c_abs(), respectively) using the PAH model from Draine & Li (2001)
+and Draine et al. (2021).
+"""
+
+__docformat__ = "numpy"
+
 import os
 from astropy.constants import c, h, k_B
 from astropy.io import fits
