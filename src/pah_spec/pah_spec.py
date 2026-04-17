@@ -23,6 +23,10 @@ import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
+
+__all__ = ["PahSpec", "calc_pah_energy"]
+
+
 GRAIN_SIZES = [
     3.5481e-04,
     3.7584e-04,
