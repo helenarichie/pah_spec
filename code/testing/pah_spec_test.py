@@ -118,35 +118,10 @@ def compare_spectra(x_actual, y_actual, x_golden, y_golden):
     y_golden_interp = np.interp(x_common, x_golden, y_golden)
     y_actual_interp = np.interp(x_common, x_actual, y_actual)
 
-    print(x_common)
-    print(y_golden_interp)
-    print(y_actual_interp)
-
     n_points = len(x_common)
     n_outliers = sum(not isclose(a, b, rel_tol=TOLERANCE) for a, b in zip(y_actual_interp, y_golden_interp))
 
     outlier_fraction = 0.05
-    print(n_outliers)
-    print(len(x_golden))
-
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(1, 2, figsize=(8, 4))
-    ax[0].loglog(x_golden, y_golden * x_golden * 1e-4, color="black", label="golden")
-    ax[0].loglog(x_actual, y_actual * x_actual * 1e-4, color="red", label="actual")
-
-    ax[1].loglog(x_common, y_golden_interp * x_common * 1e-4, color="black", label="golden")
-    ax[1].loglog(x_common, y_actual_interp * x_common * 1e-4, color="red", label="actual")
-
-    ax[1].legend()
-
-    ax[0].set_ylim(1e-26)
-    ax[0].set_xlim(1, 20)
-
-    ax[1].set_ylim(1e-26)
-    ax[1].set_xlim(1, 20)
-
-    plt.savefig("/Users/helenarichie/Desktop/testing.png")
 
     if n_outliers / n_points <= outlier_fraction:
         return "Arrays are almost equal"
