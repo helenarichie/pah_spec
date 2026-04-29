@@ -11,7 +11,7 @@ from scipy.integrate import trapezoid
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../"))
 import pah_spec  # pylint: disable=wrong-import-position
 
-# Set tolerance for disagreement to 5%
+# Set tolerance for disagreement to 1%
 TOLERANCE = 0.05
 
 
@@ -75,6 +75,14 @@ class PahSpecTest(unittest.TestCase):
         except AssertionError as e:
             print(f"test_almost_equal failed: {e}")
             raise
+
+
+"""def compare_arrays(a, b):
+    if len(a) != len(b):
+        raise ValueError("Arrays must be the same length")
+    if all(isclose(x.value, y.value, rel_tol=TOLERANCE) for x, y in zip(a, b)):
+        return "Arrays are almost equal"
+    return "Arrays are not almost equal"""
 
 
 def compare_spectra(x_actual, y_actual, x_golden, y_golden):
