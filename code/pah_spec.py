@@ -23,7 +23,6 @@ import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
-
 GRAIN_SIZES = [
     3.5481e-04,
     3.7584e-04,
@@ -193,35 +192,51 @@ class PahSpec:
         _check_param(wavelength_arr, u.um)
         _check_param(u_lambda_arr, u.erg / u.cm**4)
 
-        spectra_neu_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * u.erg / (u.cm * u.s)
-        spectra_ion_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * u.erg / (u.cm * u.s)
+        basis_spectrum_unit = u.erg / (u.cm * u.s)
+
+        spectra_neu_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * basis_spectrum_unit
+        spectra_ion_a = np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths))) * basis_spectrum_unit
+
+        # Check that that inputs for _scale_basis_spectra() have the expected units
+        _check_param(self.photon_wavelengths, u.um, iterable=True)
+        _check_param(self.emission_wavelengths, u.um, iterable=True)
+        _check_param(wavelength_arr, u.um, iterable=True)
+        _check_param(u_lambda_arr, u.erg / (u.cm**4), iterable=True)
+        _check_param(self.basis_spectra_neu, basis_spectrum_unit, iterable=True)
+        _check_param(self.basis_spectra_ion, basis_spectrum_unit, iterable=True)
+
         for i, grain_radius in enumerate(GRAIN_SIZES):
-            spectra_neu_a[i] = np.sum(
-                self._scale_basis_spectra(
-                    self.photon_wavelengths,
-                    _DELTA_LAMBDA,
-                    self.emission_wavelengths,
-                    grain_radius.to(u.AA),
-                    wavelength_arr,
-                    u_lambda_arr,
-                    self.basis_spectra_neu[i],
-                    ion=False,
-                ),
-                axis=0,
-            )
-            spectra_ion_a[i] = np.sum(
-                self._scale_basis_spectra(
-                    self.photon_wavelengths,
-                    _DELTA_LAMBDA,
-                    self.emission_wavelengths,
-                    grain_radius.to(u.AA),
-                    wavelength_arr,
-                    u_lambda_arr,
-                    self.basis_spectra_ion[i],
-                    ion=True,
-                ),
-                axis=0,
-            )
+            # Remove units from arguments to call _scale_basis_spectra()
+            spectra_neu_a[i] = (
+                np.sum(
+                    self._scale_basis_spectra(
+                        self.photon_wavelengths.value,
+                        _DELTA_LAMBDA,
+                        self.emission_wavelengths.value,
+                        grain_radius.to(u.AA).value,
+                        wavelength_arr.value,
+                        u_lambda_arr.value,
+                        self.basis_spectra_neu[i].value,
+                        ion=False,
+                    ),
+                    axis=0,
+                )
+            ) * basis_spectrum_unit  # manually set units of the function output
+            spectra_ion_a[i] = (
+                np.sum(
+                    self._scale_basis_spectra(
+                        self.photon_wavelengths.value,
+                        _DELTA_LAMBDA,
+                        self.emission_wavelengths.value,
+                        grain_radius.to(u.AA).value,
+                        wavelength_arr.value,
+                        u_lambda_arr.value,
+                        self.basis_spectra_ion[i].value,
+                        ion=True,
+                    ),
+                    axis=0,
+                )
+            ) * basis_spectrum_unit  # manually set units of the function output
 
         spectrum_neu = _size_integrate(spectra_neu_a, size_dist_neu)
         spectrum_ion = _size_integrate(spectra_ion_a, size_dist_ion)
@@ -490,64 +505,52 @@ class PahSpec:
         p_lambda_arr,
         ion,
     ):
-        """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
+        """Calculate the energy conservation normalization to scale basis vectors to the input radiation field. Note that
+        Astropy Units attributes should be stripped from input parameters for performance reasons.
 
         Parameters
         ----------
-        photon_wavelength_arr : astropy.units.Quantity (array_like)
-            Array of absorbed photon wavelengths
+        photon_wavelength_arr : numpy.ndarray
+            Array of absorbed photon wavelengths (in microns)
         dlambda : float
             Width of the "monochromatic" radiation field, defined as a percentage of lambda_abs
-        wavelength_arr : astropy.units.Quantity (array_like)
-            Array of emission wavelengths
-        grain_radius : astropy.units.Quantity (float)
-            Dust grain radius
-        wavelength_arr_u : astropy.units.Quantity (array_like)
-            Wavelength array for the radiation field u_lambda
-        u_lambda_arr : astropy.units.Quantity (array_like)
-            Array of length len(wavelengths_u) with the radiation field
-        p_lambda_arr : astropy.units.Quantity (array_like)
-            Basis vector array of size (len(photon_wavelength_arr), len(wavelength_arr)) for a given grain
+        wavelength_arr : numpy.ndarray
+            Array of emission wavelengths (in microns)
+        grain_radius : float
+            Dust grain radius (in Angstroms)
+        wavelength_arr_u : numpy.ndarray
+            Wavelength array for the radiation field u_lambda (in microns)
+        u_lambda_arr : numpy.ndarray
+            Array of length len(wavelengths_u) with the radiation field (in erg / cm**4)
+        p_lambda_arr : numpy.ndarray
+            Basis vector array of size (len(photon_wavelength_arr), len(wavelength_arr)) for a given grain (in erg / (cm * s))
         ion : bool
             Specifies whether or not the PAH is ionized, used to calculate the cross-section
 
         Returns
         -------
-        integrated_spectrum : astropy.units.Quantity (array_like)
-            Integrated spectrum for the input grain and radiation field (in units of u.erg / (u.cm * u.s) with length
+        scaled_spectrum : array_like
+            Integrated spectrum for the input grain and radiation field (erg / (cm * s)) with length
             len(wavelength_arr))
-
-        Raises
-        ------
-        AttributeError
-            If the input is not an astropy.units.Quantity object
-        TypeError
-            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
-        wavelength_unit = u.um
-        radiation_field_unit = u.erg / (u.cm**4)
-        basis_vector_unit = u.erg / (u.cm * u.s)
-        _check_param(photon_wavelength_arr, wavelength_unit, iterable=True)
-        _check_param(photon_wavelength_arr, wavelength_unit, iterable=True)
-        _check_param(wavelength_arr, wavelength_unit, iterable=True)
-        _check_param(grain_radius, u.AA)
-        _check_param(wavelength_arr_u, wavelength_unit, iterable=True)
-        _check_param(u_lambda_arr, radiation_field_unit, iterable=True)
-        _check_param(p_lambda_arr, basis_vector_unit, iterable=True)
 
         # call calc_c_abs once for all wavelength values needed by calc_normalization
         lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
         if ion:
-            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u, grain_radius)[0][0]
-            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr, grain_radius)[0][0]
+            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u * u.um, grain_radius * u.AA)[0][0].value
+            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr * u.um, grain_radius * u.AA)[0][0].value
             c_abs_phot_arr = np.insert(
-                c_abs_phot_arr, len(c_abs_phot_arr), self.calc_c_abs(lambda1_max, grain_radius)[0][0]
+                c_abs_phot_arr,
+                len(c_abs_phot_arr),
+                self.calc_c_abs(lambda1_max * u.um, grain_radius * u.AA)[0][0].value,
             )
         else:
-            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u, grain_radius)[1][0]
-            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr, grain_radius)[1][0]
+            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u * u.um, grain_radius * u.AA)[1][0].value
+            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr * u.um, grain_radius * u.AA)[1][0].value
             c_abs_phot_arr = np.insert(
-                c_abs_phot_arr, len(c_abs_phot_arr), self.calc_c_abs(lambda1_max, grain_radius)[1][0]
+                c_abs_phot_arr,
+                len(c_abs_phot_arr),
+                self.calc_c_abs(lambda1_max * u.um, grain_radius * u.AA)[1][0].value,
             )
 
         normalizations = np.zeros(len(photon_wavelength_arr))
@@ -572,10 +575,15 @@ class PahSpec:
             u_lambda_arr_mrf = np.interp(wavelength_arr_mrf, wavelength_arr_u, u_lambda_arr)
 
             # integrate to determine the power of the radiation field in this wavelength range
-            numerator = trapezoid(u_lambda_arr_mrf * c_abs_arr_mrf * c.cgs, x=wavelength_arr_mrf.to(u.cm))
+            numerator = trapezoid(
+                u_lambda_arr_mrf * c_abs_arr_mrf * c.cgs.value,
+                x=wavelength_arr_mrf * 1e-4,  # convert wavelength_arr_mrf from u.um to u.cm
+            )
 
             # integrate to determine the power radiated by the grain over all wavelengths
-            denominator = trapezoid(p_lambda_arr[i], x=wavelength_arr.to(u.cm))
+            denominator = trapezoid(
+                p_lambda_arr[i], x=wavelength_arr * 1e-4  # convert wavelength_arr from u.um to u.cm
+            )
 
             normalizations[i] = numerator / denominator
 
