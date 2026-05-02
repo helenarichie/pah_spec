@@ -93,6 +93,8 @@ _THETA_OP_CH = 1275 * u.K  # C-H out-of-plane beinding mode Debye temperature
 _THETA_IP_CH = 1670 * u.K  # C-H in-plane bending mode Debye temperature
 _THETA_STR_CH = 4360 * u.K  # C-H stretching mode Debye temperature
 
+_C_CGS = 2.99792e10  # speed of light
+
 
 class PahSpec:
     """Class for generating PAH emission spectra with the single photon approximation"""
@@ -132,8 +134,6 @@ class PahSpec:
         self.lamj_tab  # units of um
         self.sigj_neu_tab *= 1.0e-20  # units of cm
         self.sigj_ion_tab *= 1.0e-20  # units of cm
-        # self.sigj_neu_tab *= u.cm
-        # self.sigj_ion_tab *= u.cm
         hdul = fits.open(os.path.join(script_path, c_abs_data_directory, "graphite_cabs.fits"))
         rad_graphite = hdul[1].data  # units of um
         wav_graphite = hdul[2].data  # units of um
@@ -529,8 +529,8 @@ class PahSpec:
         p_lambda_arr,
         ion,
     ):
-        """Calculate the energy conservation normalization to scale basis vectors to the input radiation field. Note that
-        Astropy Units attributes should be stripped from input parameters for performance reasons.
+        """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
+        Note that Astropy Units attributes should be stripped from input parameters for performance reasons.
 
         Parameters
         ----------
@@ -601,7 +601,7 @@ class PahSpec:
 
             # integrate to determine the power of the radiation field in this wavelength range
             numerator = trapezoid(
-                u_lambda_arr_mrf * c_abs_arr_mrf * c.cgs.value,
+                u_lambda_arr_mrf * c_abs_arr_mrf * _C_CGS,
                 x=wavelength_arr_mrf * 1e-4,  # convert wavelength_arr_mrf from u.um to u.cm
             )
 
