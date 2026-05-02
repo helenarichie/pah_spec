@@ -128,18 +128,17 @@ class PahSpec:
             os.path.join(c_abs_data_directory, os.path.join(script_path, c_abs_data_directory, "draine21_Table4.dat")),
             unpack=True,
         )
-        self.lamj_tab *= u.um
-        self.sigj_neu_tab *= 1.0e-20
-        self.sigj_ion_tab *= 1.0e-20
-        self.sigj_neu_tab *= u.cm
-        self.sigj_ion_tab *= u.cm
+        # TODO: should these be private attributes?
+        self.lamj_tab  # units of um
+        self.sigj_neu_tab *= 1.0e-20  # units of cm
+        self.sigj_ion_tab *= 1.0e-20  # units of cm
+        # self.sigj_neu_tab *= u.cm
+        # self.sigj_ion_tab *= u.cm
         hdul = fits.open(os.path.join(script_path, c_abs_data_directory, "graphite_cabs.fits"))
-        rad_graphite = hdul[1].data * u.um
-        wav_graphite = hdul[2].data * u.um
-        cabs_graphite = hdul[3].data * u.cm**2
-        self.cabs_graphite_spl = interpolate.RectBivariateSpline(
-            rad_graphite.value, wav_graphite.value, cabs_graphite.value
-        )
+        rad_graphite = hdul[1].data  # units of um
+        wav_graphite = hdul[2].data  # units of um
+        cabs_graphite = hdul[3].data  # units of cm**2
+        self.cabs_graphite_spl = interpolate.RectBivariateSpline(rad_graphite, wav_graphite, cabs_graphite)
         hdul.close()
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
@@ -379,13 +378,42 @@ class PahSpec:
         wavelength_arr = _check_param(wavelength_arr, wavelength_unit, force_iterable=True)
         radius_arr = _check_param(radius_arr, radius_unit, force_iterable=True)
 
-        nc = _calc_nc(radius_arr)
+        c_abs_ion_out, c_abs_neu_out = self._calc_c_abs(wavelength_arr.value, radius_arr.value)
+
+        return c_abs_ion_out * u.cm**2, c_abs_neu_out * u.cm**2
+
+    def _calc_c_abs(self, wavelength_arr, radius_arr):
+        """Internals for calc_c_abs(). Note that Astropy Units have been stripped for performance reasons.
+
+        Parameters
+        ----------
+        wavelength_arr : numpy.ndarray
+            Array of wavelengths to calculate C_abs for (in um)
+        radius_arr : numpy.ndarray
+            Array of dust grain radii to calculate C_abs for (in Angstroms)
+
+        Returns
+        -------
+        c_abs_ion_out : numpy.ndarray
+            Array with C_abs values for ionized grains (in cm**2)
+        c_abs_neu_out : numpy.ndarray
+            Array with C_abs values for neutral grains (in cm**2)
+
+        Raises
+        ------
+        AttributeError
+            If the input is not an astropy.units.Quantity object
+        TypeError
+            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
+        """
+
+        nc = _calc_nc(radius_arr * u.AA)
         hc = 0.5 * np.ones_like(nc)  # Note that this is from Equation 4 of DL07
         hc[(nc >= 25) & (nc <= 100)] = 0.5 * np.sqrt(25 / nc[(nc >= 25) & (nc <= 100)])
         hc[nc > 100] = 0.25
-        xi_gra = np.zeros_like(radius_arr.value)
-        xi_gra[radius_arr < 50 * u.AA] = 0.01
-        xi_gra[radius_arr >= 50 * u.AA] = 0.01 + 0.99 * (1.0 - (50 * u.AA / radius_arr[radius_arr >= 50 * u.AA]) ** 3)
+        xi_gra = np.zeros_like(radius_arr)
+        xi_gra[radius_arr < 50] = 0.01
+        xi_gra[radius_arr >= 50] = 0.01 + 0.99 * (1.0 - (50 / radius_arr[radius_arr >= 50]) ** 3)
 
         def s_func(lam, lamj, gamma, sigma):
             num = 2 * gamma * lamj * sigma
@@ -398,68 +426,68 @@ class PahSpec:
         # Cutoff function parameters
         m_ring = 0.3 * nc
         m_ring[nc > 40] = 0.4 * nc[nc > 40]
-        lamc_neu = 0.951 * u.um / (1.0 + 3.616 / np.sqrt(m_ring))
-        lamc_ion = 1.125 * u.um / (1.0 + 2.567 / np.sqrt(m_ring))
+        lamc_neu = 0.951 / (1.0 + 3.616 / np.sqrt(m_ring))  # um
+        lamc_ion = 1.125 / (1.0 + 2.567 / np.sqrt(m_ring))  # um
 
-        x = (1.0 * u.um / wavelength_arr).value
-        c_abs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
-        c_abs_neu_out = np.zeros((len(radius_arr), len(wavelength_arr))) * u.cm**2
+        x = 1.0 / wavelength_arr  # um
+        c_abs_ion_out = np.zeros((len(radius_arr), len(wavelength_arr)))  # cm**2
+        c_abs_neu_out = np.zeros((len(radius_arr), len(wavelength_arr)))  # cm**2
 
         for i in range(len(radius_arr)):
-            graph_cont = self.cabs_graphite_spl.ev(radius_arr[i].to(u.um), wavelength_arr.value) * u.cm**2
-            c_abs_ion_out[i, :] += xi_gra[i] * graph_cont
-            c_abs_neu_out[i, :] += xi_gra[i] * graph_cont
+            # cabs_graphite_spl expects units of um for both radius and wavelength parameters
+            graph_cont = self.cabs_graphite_spl.ev(radius_arr[i] * 0.0001, wavelength_arr)  # cm**2
+            c_abs_ion_out[i, :] += xi_gra[i] * graph_cont  # cm**2
+            c_abs_neu_out[i, :] += xi_gra[i] * graph_cont  # cm**2
 
             # PAH contribution
             c_fac_neu = c_func(
-                (wavelength_arr / lamc_neu[i]).value ** -1
+                (wavelength_arr / lamc_neu[i]) ** -1
             )  # Note error in Equation A7, should be C(lambda_c/lambda)
             c_fac_ion = c_func(
-                (wavelength_arr / lamc_ion[i]).value ** -1
+                (wavelength_arr / lamc_ion[i]) ** -1
             )  # Note error in Equation A7, should be C(lambda_c/lambda)
-            s_mat_neu = np.zeros((len(self.lamj_tab), len(wavelength_arr))) * u.cm**2
-            s_mat_ion = np.zeros((len(self.lamj_tab), len(wavelength_arr))) * u.cm**2
+            s_mat_neu = np.zeros((len(self.lamj_tab), len(wavelength_arr)))  # cm**2
+            s_mat_ion = np.zeros((len(self.lamj_tab), len(wavelength_arr)))  # cm**2
             for j in range(len(self.lamj_tab)):
                 if self.hc_tab[j] == 0:
-                    s_mat_neu[j, :] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j])
-                    s_mat_ion[j, :] = s_func(wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j])
-                else:
+                    # s_func param units: um -> cm, um -> cm, dimensionless, cm; units of s_func are cm**2
                     s_mat_neu[j, :] = s_func(
-                        wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_neu_tab[j] * hc[i]
+                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_neu_tab[j]
                     )
                     s_mat_ion[j, :] = s_func(
-                        wavelength_arr, self.lamj_tab[j], self.gamj_tab[j], self.sigj_ion_tab[j] * hc[i]
+                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_ion_tab[j]
+                    )
+                else:
+                    s_mat_neu[j, :] = s_func(
+                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_neu_tab[j] * hc[i]
+                    )
+                    s_mat_ion[j, :] = s_func(
+                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_ion_tab[j] * hc[i]
                     )
 
             idx = np.where((10 < x) & (x < 15))
-            c_abs_ion_out[i, idx] += (
-                (s_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                (s_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18 * u.cm**2) * nc[i] * (1.0 - xi_gra[i])
-            )
+            c_abs_ion_out[i, idx] += (s_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18) * nc[i] * (1.0 - xi_gra[i])
+            c_abs_neu_out[i, idx] += (s_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18) * nc[i] * (1.0 - xi_gra[i])
 
             idx = np.where((7.7 < x) & (x <= 10))
             c_abs_ion_out[i, idx] += (
                 (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
                 * 1.0e-18
-                * u.cm**2
                 * nc[i]
                 * (1.0 - xi_gra[i])
             )
             c_abs_neu_out[i, idx] += (
                 (66.302 - 24.367 * x[idx] + 2.950 * x[idx] ** 2 - 0.1057 * x[idx] ** 3)
                 * 1.0e-18
-                * u.cm**2
                 * nc[i]
                 * (1.0 - xi_gra[i])
             )
 
             idx = np.where((5.9 < x) & (x <= 7.7))
-            c0 = 1.8687e-18 * u.cm**2
-            c1 = 1.905e-19 * u.cm**2
-            c2 = 4.175e-19 * u.cm**2
-            c3 = 4.37e-20 * u.cm**2  # Note Equations A11 and A12 are mislabeled
+            c0 = 1.8687e-18  # cm**2
+            c1 = 1.905e-19  # cm**2
+            c2 = 4.175e-19  # cm**2
+            c3 = 4.37e-20  # cm**2, Note Equations A11 and A12 are mislabeled
             c_abs_ion_out[i, idx] += (
                 (s_mat_ion[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
                 * nc[i]
@@ -476,12 +504,8 @@ class PahSpec:
             c_abs_neu_out[i, idx] += (s_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
 
             idx = np.where(x <= 3.3)
-            c_abs_ion_out[i, idx] += (
-                34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * c_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
-            )
-            c_abs_neu_out[i, idx] += (
-                34.58e-18 * 10 ** (-3.431 / x[idx]) * u.cm**2 * c_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
-            )
+            c_abs_ion_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
+            c_abs_neu_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
 
             for j in range(len(self.lamj_tab)):
                 if j > 1:
@@ -489,7 +513,7 @@ class PahSpec:
                     c_abs_neu_out[i, idx] += s_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
 
             c_abs_ion_out[i, idx] += (
-                3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i]) * u.cm**2
+                3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i])
             )  # Note: does not appear in D21+
 
         return c_abs_ion_out, c_abs_neu_out
@@ -523,34 +547,35 @@ class PahSpec:
         u_lambda_arr : numpy.ndarray
             Array of length len(wavelengths_u) with the radiation field (in erg / cm**4)
         p_lambda_arr : numpy.ndarray
-            Basis vector array of size (len(photon_wavelength_arr), len(wavelength_arr)) for a given grain (in erg / (cm * s))
+            Basis vector array of size (len(photon_wavelength_arr), len(wavelength_arr)) for a given grain
+            (in erg / (cm * s))
         ion : bool
             Specifies whether or not the PAH is ionized, used to calculate the cross-section
 
         Returns
         -------
         scaled_spectrum : array_like
-            Integrated spectrum for the input grain and radiation field (erg / (cm * s)) with length
+            Integrated spectrum for the input grain and radiation field (in erg / (cm * s)) with length
             len(wavelength_arr))
         """
 
         # call calc_c_abs once for all wavelength values needed by calc_normalization
         lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
         if ion:
-            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u * u.um, grain_radius * u.AA)[0][0].value
-            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr * u.um, grain_radius * u.AA)[0][0].value
+            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[0][0]
+            c_abs_phot_arr = self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[0][0]
             c_abs_phot_arr = np.insert(
                 c_abs_phot_arr,
                 len(c_abs_phot_arr),
-                self.calc_c_abs(lambda1_max * u.um, grain_radius * u.AA)[0][0].value,
+                self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[0][0],
             )
         else:
-            c_abs_arr_u = self.calc_c_abs(wavelength_arr_u * u.um, grain_radius * u.AA)[1][0].value
-            c_abs_phot_arr = self.calc_c_abs(photon_wavelength_arr * u.um, grain_radius * u.AA)[1][0].value
+            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[1][0]
+            c_abs_phot_arr = self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[1][0]
             c_abs_phot_arr = np.insert(
                 c_abs_phot_arr,
                 len(c_abs_phot_arr),
-                self.calc_c_abs(lambda1_max * u.um, grain_radius * u.AA)[1][0].value,
+                self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[1][0],
             )
 
         normalizations = np.zeros(len(photon_wavelength_arr))
