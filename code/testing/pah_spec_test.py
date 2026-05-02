@@ -24,15 +24,17 @@ class PahSpecTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        test_dir = os.path.dirname(__file__)
+        test_dir = os.path.dirname(os.path.abspath(__file__))
 
-        golden_path = os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv")
+        golden_path = os.path.normpath(os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv"))
+
         goldens = np.loadtxt(golden_path, delimiter=",", skiprows=1)
         cls.golden_wavelength_arr = goldens[:, 0] * u.um
         cls.golden_spectrum_neu = goldens[:, 1] * u.erg / (u.cm * u.s)
         cls.golden_spectrum_ion = goldens[:, 2] * u.erg / (u.cm * u.s)
 
-        basis_path = os.path.join(test_dir, "../../data/test_data/basis_spectra_low_res/")
+        basis_path = os.path.normpath(os.path.join(test_dir, "../../data/test_data/basis_spectra_low_res/"))
+
         cls.ps = pah_spec.PahSpec(basis_directory=basis_path)
 
         cls.actual_spectrum_neu, cls.actual_spectrum_ion = cls.ps.generate_spectrum()
@@ -49,13 +51,13 @@ class PahSpecTest(unittest.TestCase):
             actual_power_neu.value,
             expected_power_neu.value,
             delta=TOLERANCE,
-            msg="Integrated PAH0 spectral power differs by more than 1%",
+            msg=f"Integrated PAH0 spectral power differs by more than {TOLERANCE*100}%",
         )
         self.assertAlmostEqual(
             actual_power_ion.value,
             expected_power_ion.value,
             delta=TOLERANCE,
-            msg="Integrated PAH+ spectral power differs by more than 1%",
+            msg=f"Integrated PAH+ spectral power differs by more than {TOLERANCE*100}%",
         )
 
     def test_spectral_shape(self):
