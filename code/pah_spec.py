@@ -106,7 +106,7 @@ class PahSpec:
         # Check if the cross section path exists
         if not os.path.exists(os.path.join(script_path, c_abs_data_directory)):
             error_string = (
-                f"calc_cabs expects to find qabs_001um.dat and draine21_Table4.dat at {c_abs_data_directory}, "
+                f"calc_cabs expects to find graphite_cabs.fits and draine21_Table4.dat at {c_abs_data_directory}, "
                 "but the path does not exist"
             )
             raise FileNotFoundError(error_string)
@@ -122,22 +122,16 @@ class PahSpec:
         )
 
         # Load the cross section data into memory, TODO: should these be private attributes?
-        self.wav_graphite, self.qabs = np.genfromtxt(
-            os.path.join(script_path, c_abs_data_directory, "qabs_001um.dat"), unpack=True, usecols=[0, 2]
-        )
-        self.wav_graphite *= u.um
-        self.lamj_tab, self.gamj_tab, self.sigj_neu_tab, self.sigj_ion_tab, self.hc_tab = np.genfromtxt(
+        # _lamj_tab units are um
+        self._lamj_tab, self._gamj_tab, self._sigj_neu_tab, self._sigj_ion_tab, self._hc_tab = np.genfromtxt(
             os.path.join(c_abs_data_directory, os.path.join(script_path, c_abs_data_directory, "draine21_Table4.dat")),
             unpack=True,
         )
-        self.lamj_tab  # units of um
-        self.sigj_neu_tab *= 1.0e-20  # units of cm
-        self.sigj_ion_tab *= 1.0e-20  # units of cm
+        self._sigj_neu_tab *= 1.0e-20  # units of cm
+        self._sigj_ion_tab *= 1.0e-20  # units of cm
         hdul = fits.open(os.path.join(script_path, c_abs_data_directory, "graphite_cabs.fits"))
-        rad_graphite = hdul[1].data  # units of um
-        wav_graphite = hdul[2].data  # units of um
-        cabs_graphite = hdul[3].data  # units of cm**2
-        self.cabs_graphite_spl = interpolate.RectBivariateSpline(rad_graphite, wav_graphite, cabs_graphite)
+        # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
+        self._cabs_graphite_spl = interpolate.RectBivariateSpline(hdul[1].data, hdul[2].data, hdul[3].data)
         hdul.close()
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
@@ -434,7 +428,7 @@ class PahSpec:
 
         for i in range(len(radius_arr)):
             # cabs_graphite_spl expects units of um for both radius and wavelength parameters
-            graph_cont = self.cabs_graphite_spl.ev(radius_arr[i] * 0.0001, wavelength_arr)  # cm**2
+            graph_cont = self._cabs_graphite_spl.ev(radius_arr[i] * 0.0001, wavelength_arr)  # cm**2
             c_abs_ion_out[i, :] += xi_gra[i] * graph_cont  # cm**2
             c_abs_neu_out[i, :] += xi_gra[i] * graph_cont  # cm**2
 
@@ -445,23 +439,29 @@ class PahSpec:
             c_fac_ion = c_func(
                 (wavelength_arr / lamc_ion[i]) ** -1
             )  # Note error in Equation A7, should be C(lambda_c/lambda)
-            s_mat_neu = np.zeros((len(self.lamj_tab), len(wavelength_arr)))  # cm**2
-            s_mat_ion = np.zeros((len(self.lamj_tab), len(wavelength_arr)))  # cm**2
-            for j in range(len(self.lamj_tab)):
-                if self.hc_tab[j] == 0:
+            s_mat_neu = np.zeros((len(self._lamj_tab), len(wavelength_arr)))  # cm**2
+            s_mat_ion = np.zeros((len(self._lamj_tab), len(wavelength_arr)))  # cm**2
+            for j in range(len(self._lamj_tab)):
+                if self._hc_tab[j] == 0:
                     # s_func param units: um -> cm, um -> cm, dimensionless, cm; units of s_func are cm**2
                     s_mat_neu[j, :] = s_func(
-                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_neu_tab[j]
+                        wavelength_arr * 1e-4, self._lamj_tab[j] * 1e-4, self._gamj_tab[j], self._sigj_neu_tab[j]
                     )
                     s_mat_ion[j, :] = s_func(
-                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_ion_tab[j]
+                        wavelength_arr * 1e-4, self._lamj_tab[j] * 1e-4, self._gamj_tab[j], self._sigj_ion_tab[j]
                     )
                 else:
                     s_mat_neu[j, :] = s_func(
-                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_neu_tab[j] * hc[i]
+                        wavelength_arr * 1e-4,
+                        self._lamj_tab[j] * 1e-4,
+                        self._gamj_tab[j],
+                        self._sigj_neu_tab[j] * hc[i],
                     )
                     s_mat_ion[j, :] = s_func(
-                        wavelength_arr * 1e-4, self.lamj_tab[j] * 1e-4, self.gamj_tab[j], self.sigj_ion_tab[j] * hc[i]
+                        wavelength_arr * 1e-4,
+                        self._lamj_tab[j] * 1e-4,
+                        self._gamj_tab[j],
+                        self._sigj_ion_tab[j] * hc[i],
                     )
 
             idx = np.where((10 < x) & (x < 15))
@@ -506,7 +506,7 @@ class PahSpec:
             c_abs_ion_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
             c_abs_neu_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
 
-            for j in range(len(self.lamj_tab)):
+            for j in range(len(self._lamj_tab)):
                 if j > 1:
                     c_abs_ion_out[i, idx] += s_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
                     c_abs_neu_out[i, idx] += s_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
