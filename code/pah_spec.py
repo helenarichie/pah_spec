@@ -121,7 +121,7 @@ class PahSpec:
             _read_basis_spectra(os.path.join(script_path, basis_directory))
         )
 
-        # Load the cross section data into memory
+        # Load the cross section data into memory, TODO: should these be private attributes?
         self.wav_graphite, self.qabs = np.genfromtxt(
             os.path.join(script_path, c_abs_data_directory, "qabs_001um.dat"), unpack=True, usecols=[0, 2]
         )
@@ -130,7 +130,6 @@ class PahSpec:
             os.path.join(c_abs_data_directory, os.path.join(script_path, c_abs_data_directory, "draine21_Table4.dat")),
             unpack=True,
         )
-        # TODO: should these be private attributes?
         self.lamj_tab  # units of um
         self.sigj_neu_tab *= 1.0e-20  # units of cm
         self.sigj_ion_tab *= 1.0e-20  # units of cm
@@ -530,7 +529,7 @@ class PahSpec:
         ion,
     ):
         """Calculate the energy conservation normalization to scale basis vectors to the input radiation field.
-        Note that Astropy Units attributes should be stripped from input parameters for performance reasons.
+        Note that Astropy Units attributes should be stripped from input parameters (for performance reasons).
 
         Parameters
         ----------
@@ -563,19 +562,19 @@ class PahSpec:
         lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
         if ion:
             c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[0][0]
-            c_abs_phot_arr = self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[0][0]
-            c_abs_phot_arr = np.insert(
-                c_abs_phot_arr,
-                len(c_abs_phot_arr),
-                self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[0][0],
+            c_abs_phot_arr = np.concatenate(
+                [
+                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[0][0],
+                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[0][0],
+                ],
             )
         else:
             c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[1][0]
-            c_abs_phot_arr = self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[1][0]
-            c_abs_phot_arr = np.insert(
-                c_abs_phot_arr,
-                len(c_abs_phot_arr),
-                self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[1][0],
+            c_abs_phot_arr = np.concatenate(
+                [
+                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[1][0],
+                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[1][0],
+                ],
             )
 
         normalizations = np.zeros(len(photon_wavelength_arr))
@@ -584,17 +583,12 @@ class PahSpec:
             # define wavelengths of monochromatic radiation field (MRF)
             lambda0, lambda1 = lambda_abs, lambda_abs + lambda_abs * dlambda
             wh_mrf = np.where(np.logical_and(wavelength_arr_u > lambda0, wavelength_arr_u < lambda1))
-            wavelength_arr_mrf = wavelength_arr_u[wh_mrf]
-            wavelength_arr_mrf = np.insert(wavelength_arr_mrf, [0, len(wavelength_arr_mrf)], [lambda0, lambda1])
+            wavelength_arr_mrf = np.concatenate([[lambda0], wavelength_arr_u[wh_mrf], [lambda1]])
 
             # get cross-section values of MRF
-            c_abs_arr_mrf = c_abs_arr_u[wh_mrf]
-            wh0, wh1 = np.argmin(np.abs(lambda0 - photon_wavelength_arr)), np.argmin(
-                np.abs(lambda1 - photon_wavelength_arr)
-            )
-            c_abs_arr_mrf = np.insert(
-                c_abs_arr_mrf, [0, len(c_abs_arr_mrf)], [c_abs_phot_arr[wh0], c_abs_phot_arr[wh1]]
-            )
+            wh0 = np.argmin(np.abs(lambda0 - photon_wavelength_arr))
+            wh1 = np.argmin(np.abs(lambda1 - photon_wavelength_arr))
+            c_abs_arr_mrf = np.concatenate([[c_abs_phot_arr[wh0]], c_abs_arr_u[wh_mrf], [c_abs_phot_arr[wh1]]])
 
             # interpolate radiation field to the MRF wavelength range
             u_lambda_arr_mrf = np.interp(wavelength_arr_mrf, wavelength_arr_u, u_lambda_arr)
@@ -615,7 +609,7 @@ class PahSpec:
         return p_lambda_arr * normalizations[:, np.newaxis]
 
 
-############################## general pah_spec methods ##############################
+############################## general pah_spec functions ##############################
 
 
 def calc_pah_energy(grain_radius, temp_arr):
