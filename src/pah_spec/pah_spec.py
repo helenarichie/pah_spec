@@ -99,51 +99,60 @@ _THETA_STR_CH = 4360 * u.K  # C-H stretching mode Debye temperature
 
 _C_CGS = 2.99792e10  # speed of light
 
+# todo: use importlib.resource (or possibly pooch) to more properly handle datafiles
+# -> these paths are only valid in editable installations
+_SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))  # <- dir holding this file
+_BUILTIN_BASIS_DIR = os.path.join(_SOURCE_DIR, "../../data/basis_spectra")
+_BUILTIN_C_ABS_DATA_DIR = os.path.join(_SOURCE_DIR, "../../data/c_abs_data")
+_BUILTIN_DATA_DEFAULT_DIR = os.path.join(_SOURCE_DIR, "../../data/defaults/")
 
 class PahSpec:
     """Class for generating PAH emission spectra with the single photon approximation"""
 
-    def __init__(self, basis_directory="../../data/basis_spectra", c_abs_data_directory="../../data/c_abs_data"):
-        # Path of pah_spec.py
-        script_path = os.path.dirname(os.path.abspath(__file__))
+    def __init__(self, basis_directory=None, c_abs_data_directory=None):
+        if basis_directory is None:
+            basis_directory = _BUILTIN_BASIS_DIR
+
+        if c_abs_data_directory is None:
+            c_abs_data_directory = _BUILTIN_C_ABS_DATA_DIR
 
         # Check if the cross section path exists
-        if not os.path.exists(os.path.join(script_path, c_abs_data_directory)):
+        if not os.path.exists(c_abs_data_directory):
             error_string = (
                 f"calc_cabs expects to find graphite_cabs.fits and draine21_Table4.dat at {c_abs_data_directory}, "
                 "but the path does not exist"
             )
             raise FileNotFoundError(error_string)
         # Check if the basis spectra path exists
-        if not os.path.exists(os.path.join(script_path, basis_directory)):
+        if not os.path.exists(basis_directory):
             raise FileNotFoundError(
                 f"Exptected to find basis spectra at {basis_directory}, but the path does not exist"
             )
 
         # Load the basis spectra into memory
         self.emission_wavelengths, self.photon_wavelengths, self.basis_spectra_neu, self.basis_spectra_ion = (
-            _read_basis_spectra(os.path.join(script_path, basis_directory))
+            _read_basis_spectra(basis_directory)
         )
 
         # Load the cross section data into memory, TODO: should these be private attributes?
         # _lamj_tab units are um
         self._lamj_tab, self._gamj_tab, self._sigj_neu_tab, self._sigj_ion_tab, self._hc_tab = np.genfromtxt(
-            os.path.join(c_abs_data_directory, os.path.join(script_path, c_abs_data_directory, "draine21_Table4.dat")),
+            os.path.join(c_abs_data_directory, "draine21_Table4.dat"),
             unpack=True,
         )
         self._sigj_neu_tab *= 1.0e-20  # units of cm
         self._sigj_ion_tab *= 1.0e-20  # units of cm
-        hdul = fits.open(os.path.join(script_path, c_abs_data_directory, "graphite_cabs.fits"))
+        hdul = fits.open(os.path.join(c_abs_data_directory, "graphite_cabs.fits"))
         # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
         self._cabs_graphite_spl = interpolate.RectBivariateSpline(hdul[1].data, hdul[2].data, hdul[3].data)
         hdul.close()
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
-        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(script_path)
+        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist()
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
-        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(script_path)
+        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field()
 
     def generate_spectrum(self, wavelength_arr=None, u_lambda_arr=None, size_dist_neu=None, size_dist_ion=None):
         """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
@@ -1289,8 +1298,9 @@ def _read_basis_spectra(basis_directory):
     return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion
 
 
-def _read_size_dist(script_path):
-    data_path = os.path.join(script_path, "../../data/defaults/")
+def _read_size_dist(data_path = None):
+    # perhaps a non-None data_path value should be passed directly to pd.read_csv?
+    data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
 
     df = pd.read_csv(os.path.join(data_path, "pahspec_dnda.out_st_std"), sep="\\s+", skiprows=1)
     rad = df["rad"].to_numpy() * u.um
@@ -1300,8 +1310,9 @@ def _read_size_dist(script_path):
     return rad, size_dist_neu, size_dist_ion
 
 
-def _read_radiation_field(script_path):
-    data_path = os.path.join(script_path, "../../data/defaults/")
+def _read_radiation_field(data_path = None):
+    # perhaps a non-None data_path value should be passed directly to pd.read_csv?
+    data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
 
     df = pd.read_csv(os.path.join(data_path, "isrf_mmpisrf_0.00"), sep="\\s+", skiprows=6)
     wavelength_arr_u = df["(um)"].to_numpy() * u.um
