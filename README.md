@@ -34,6 +34,23 @@ There are 3 ways to do this:
 
 ## Development
 
+### Linting
+
+We use the [Ruff Linter](https://docs.astral.sh/ruff/linter/) tool to lint code in this repository.
+This is also provided as part of the popular [Ruff](https://github.com/astral-sh/ruff) and is invoked via ``ruff check`` (at this time, we don't currently use the ruff-formatter).
+
+To install the appropriate version of this tool, you can invoke
+
+```sh
+pip install --group lint
+```
+
+from the root of the directory.
+
+Note: this will **NOT** install ``pah_spec``, itself.
+
+### Testing
+
 To run the tests, you should install ``pah_spec`` and then execute the following command from the root of the repository:
 
 ```sh
