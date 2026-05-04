@@ -19,8 +19,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install astropy scipy numpy pandas scipy requests
+      # the "-e" flag instructs the package to be installed in editable mode
+      - name: Install pah_spec package
+        run: pip install -e .
 
       - name: Run tests
-        run: python -m unittest discover -s code/testing -p "pah_spec_test.py"
+        run: python -m unittest discover -s tests -p "pah_spec_test.py"

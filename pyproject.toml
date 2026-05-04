@@ -1,0 +1,35 @@
+[build-system]
+# here we specify the build-backend. For context:
+# - tools like pip and uv are example of build-frontends. Users directly
+#   interact with the frontend
+# - tools like setuptools, hatchling, scikit-build-core, meson-python are all
+#   examples of build backends
+requires = [
+    # the version bound is recommended in the docs
+    "flit_core >=3.11,<4"
+]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "pah_spec"
+version = "0.1"
+license = "MIT"
+license-files = ["LICENSE"]
+# we may need to adjust the version bounds
+requires-python = ">=3.6"
+description = "tool for generating PAH spectra with the single photon approximation"
+readme = "README.md"
+authors = [{name = "Helena Richie", email = "helenarichie@pitt.edu"}]
+# we should probably add version bounds
+dependencies = [
+  'astropy',
+  'numpy',
+  'pandas',
+  'scipy'
+]
+
+[project.urls]
+Homepage = 'https://github.com/helenarichie/pah_spec'
+Source = 'https://github.com/helenarichie/pah_spec'
+Tracker = 'https://github.com/helenarichie/pah_spec/issues'
+
