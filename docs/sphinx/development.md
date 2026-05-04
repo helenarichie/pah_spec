@@ -2,11 +2,16 @@
 
 ## Testing
 
-To run the tests, you should install ``pah_spec`` and then execute the following command from the root of the repository:
+We use the [pytest](https://docs.pytest.org/en/stable/) framework to write tests.
+
+To install the appropriate version of this tool, you can invoke the following command from the root of the repository.
 
 ```sh
-python -m unittest discover -s tests -p "pah_spec_test.py"
+pip install --group test
 ```
+
+To actually execute the tests (``pah_spec`` must be installed), you should invoke ``pytest`` (or ``python -m pytest``) from the root of the repository.
+
 
 ## Writing and Building Docs
 

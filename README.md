@@ -28,7 +28,6 @@ There are 3 ways to do this:
    python -m pip install --user -e .
    ```
 
-
 ## Dependencies:
 
 The above commands will properly install all python dependencies (please open an issue if you encounter a version incompatability).
