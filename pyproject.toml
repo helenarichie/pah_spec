@@ -27,3 +27,9 @@ dependencies = [
   'pandas',
   'scipy'
 ]
+
+[project.urls]
+Homepage = 'https://github.com/helenarichie/pah_spec'
+Source = 'https://github.com/helenarichie/pah_spec'
+Tracker = 'https://github.com/helenarichie/pah_spec/issues'
+
