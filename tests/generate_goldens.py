@@ -3,12 +3,11 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, "../")
 import pah_spec  # pylint: disable=wrong-import-position
 
 test_dir = os.path.dirname(__file__)
-golden_path = os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv")
-basis_path = os.path.join(test_dir, "../../data/test_data/basis_spectra_low_res/")
+golden_path = os.path.join(test_dir, "../data/test_data/pah_spec_golden.csv")
+basis_path = os.path.join(test_dir, "../data/test_data/basis_spectra_low_res/")
 ps = pah_spec.PahSpec(basis_directory=basis_path)
 spectrum_neu, spectrum_ion = ps.generate_spectrum()
 

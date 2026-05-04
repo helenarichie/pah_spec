@@ -8,7 +8,6 @@ import numpy as np
 
 from scipy.integrate import trapezoid
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../"))
 import pah_spec  # pylint: disable=wrong-import-position
 
 # Set tolerance for disagreement to 5%
@@ -26,14 +25,14 @@ class PahSpecTest(unittest.TestCase):
     def setUpClass(cls):
         test_dir = os.path.dirname(os.path.abspath(__file__))
 
-        golden_path = os.path.normpath(os.path.join(test_dir, "../../data/test_data/pah_spec_golden.csv"))
+        golden_path = os.path.normpath(os.path.join(test_dir, "../data/test_data/pah_spec_golden.csv"))
 
         goldens = np.loadtxt(golden_path, delimiter=",", skiprows=1)
         cls.golden_wavelength_arr = goldens[:, 0] * u.um
         cls.golden_spectrum_neu = goldens[:, 1] * u.erg / (u.cm * u.s)
         cls.golden_spectrum_ion = goldens[:, 2] * u.erg / (u.cm * u.s)
 
-        basis_path = os.path.normpath(os.path.join(test_dir, "../../data/test_data/basis_spectra_low_res/"))
+        basis_path = os.path.normpath(os.path.join(test_dir, "../data/test_data/basis_spectra_low_res/"))
 
         cls.ps = pah_spec.PahSpec(basis_directory=basis_path)
 
