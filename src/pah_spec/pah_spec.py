@@ -24,7 +24,7 @@ from scipy.integrate import trapezoid
 from scipy import interpolate
 
 
-__all__ = ["PahSpec", "calc_pah_energy"]
+__all__ = ["PahSpec", "calc_pah_energy", "GRAIN_SIZES"]
 
 
 GRAIN_SIZES = [
