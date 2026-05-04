@@ -1,6 +1,5 @@
 from math import isclose
 import os
-import sys
 import unittest
 
 import astropy.units as u
