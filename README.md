@@ -32,3 +32,10 @@ There are 3 ways to do this:
    python -m pip install --user -e .
    ```
 
+## Development
+
+To run the tests, you should install ``pah_spec`` and then execute the following command from the root of the repository:
+
+```sh
+python -m unittest discover -s tests -p "pah_spec_test.py"
+```
