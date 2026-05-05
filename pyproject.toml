@@ -12,9 +12,10 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "pah_spec"
-version = "0.1"
 license = "MIT"
 license-files = ["LICENSE"]
+# detect the version number from the __version__ variable in _version.py
+dynamic = ["version"]
 # we may need to adjust the version bounds
 requires-python = ">=3.6"
 description = "tool for generating PAH spectra with the single photon approximation"
