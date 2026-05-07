@@ -17,12 +17,12 @@ import os
 from astropy.constants import c, h, k_B
 from astropy.io import fits
 import astropy.units as u
+import h5py
 import numpy as np
 from numpy import exp
 import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
-
 
 __all__ = ["PahSpec", "calc_pah_energy", "GRAIN_SIZES"]
 
@@ -106,6 +106,7 @@ _BUILTIN_BASIS_DIR = os.path.join(_SOURCE_DIR, "../../data/basis_spectra")
 _BUILTIN_C_ABS_DATA_DIR = os.path.join(_SOURCE_DIR, "../../data/c_abs_data")
 _BUILTIN_DATA_DEFAULT_DIR = os.path.join(_SOURCE_DIR, "../../data/defaults/")
 
+
 class PahSpec:
     """Class for generating PAH emission spectra with the single photon approximation"""
 
@@ -130,9 +131,12 @@ class PahSpec:
             )
 
         # Load the basis spectra into memory
-        self.emission_wavelengths, self.photon_wavelengths, self.basis_spectra_neu, self.basis_spectra_ion = (
-            _read_basis_spectra(basis_directory)
-        )
+        with h5py.File(os.path.join(basis_directory, "basis_ion.h5"), "r") as f:
+            self.emission_wavelengths = f["lambda_em"] * u.um
+            self.photon_wavelengths = f["lambda_abs"] * u.um
+            self.basis_spectra_ion = f["basis_spectra"] * u.erg / (u.s * u.cm)
+        with h5py.File(os.path.join(basis_directory, "basis_neu.h5"), "r") as f:
+            self.basis_spectra_neu = f["basis_spectra"] * u.erg / (u.s * u.cm)
 
         # Load the cross section data into memory, TODO: should these be private attributes?
         # _lamj_tab units are um
@@ -1264,41 +1268,7 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     return photon_wavelengths
 
 
-def _read_basis_spectra_for_ionization(filename, dims):
-    df = pd.read_pickle(filename)
-
-    basis_spectra_i = np.zeros((dims))
-    for j, col in enumerate(df):
-        basis_spectra_i[j] = df[col].to_numpy()
-    basis_spectra_i *= u.erg / (u.s * u.cm)
-
-    return basis_spectra_i
-
-
-def _read_basis_spectra(basis_directory):
-
-    df = pd.read_csv(os.path.join(basis_directory, "lambda_em.csv"))
-    emission_wavelengths = df["lambda_em [um]"].to_numpy(dtype=float) * u.um
-
-    df = pd.read_csv(os.path.join(basis_directory, "lambda_abs.csv"))
-    photon_wavelengths = df["lambda_abs [um]"].to_numpy(dtype=float) * u.um
-
-    dims = (len(photon_wavelengths), len(emission_wavelengths))
-
-    basis_spectra_neu = np.zeros((len(GRAIN_SIZES), dims[0], dims[1])) * u.erg / (u.s * u.cm)
-    basis_spectra_ion = np.zeros((len(GRAIN_SIZES), dims[0], dims[1])) * u.erg / (u.s * u.cm)
-    for i, grain_radius in enumerate(GRAIN_SIZES):
-
-        filename_neu = os.path.join(basis_directory, f"neu/basis_neu_{grain_radius.to(u.AA).value:.3f}.pkl")
-        filename_ion = os.path.join(basis_directory, f"ion/basis_ion_{grain_radius.to(u.AA).value:.3f}.pkl")
-
-        basis_spectra_neu[i] = _read_basis_spectra_for_ionization(filename_neu, dims)
-        basis_spectra_ion[i] = _read_basis_spectra_for_ionization(filename_ion, dims)
-
-    return emission_wavelengths, photon_wavelengths, basis_spectra_neu, basis_spectra_ion
-
-
-def _read_size_dist(data_path = None):
+def _read_size_dist(data_path=None):
     # perhaps a non-None data_path value should be passed directly to pd.read_csv?
     data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
 
@@ -1310,7 +1280,7 @@ def _read_size_dist(data_path = None):
     return rad, size_dist_neu, size_dist_ion
 
 
-def _read_radiation_field(data_path = None):
+def _read_radiation_field(data_path=None):
     # perhaps a non-None data_path value should be passed directly to pd.read_csv?
     data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
 

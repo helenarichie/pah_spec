@@ -1,10 +1,5 @@
-# `pah_spec`: a code for generating PAH spectra using arbitrary radiation fields
+# `pah_spec`: a tool for fast, flexible computation of PAH emission spectra with the single photon approximation
 
-Dependencies: astropy, numpy, pandas, scipy. Tested with python 3.13.7, astropy 6.1.2, numpy 2.3.2, pandas 2.3.2, scipy 1.16.1.
-
-For instructions on code usage, see the examples in [examples/generate_spectrum_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_spectrum_example.ipynb) and [examples/generate_basis_spectra_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_basis_spectra_example.ipynb).
-
-`pah_spec.PahSpec` requires that a set of basis spectra can be found in the `data/basis_spectra` folder of this repository. We provide a pre-computed set of basis spectra, which can be downloaded from [here](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LUUXEJ).
 
 ## Installation
 
@@ -31,6 +26,19 @@ There are 3 ways to do this:
    ```sh
    python -m pip install --user -e .
    ```
+
+
+## Dependencies: 
+
+astropy, h5py, numpy, pandas, scipy. Tested with python 3.13.7, h5py 3.14.0, astropy 6.1.2, numpy 2.3.2, pandas 2.3.2, scipy 1.16.1.
+
+`pah_spec.PahSpec` requires that basis_ion.h5 and basis_neu.h5 data files can be found in the `data/basis_spectra` folder of this repository. We provide pre-computed basis spectra, which can be downloaded from [here](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LUUXEJ).
+
+
+## Examples:
+
+For instructions on code usage, see the examples in [examples/generate_spectrum_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_spectrum_example.ipynb) and [examples/generate_basis_spectra_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_basis_spectra_example.ipynb).
+
 
 ## Development
 

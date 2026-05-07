@@ -19,13 +19,14 @@ license-files = ["LICENSE"]
 requires-python = ">=3.6"
 description = "tool for generating PAH spectra with the single photon approximation"
 readme = "README.md"
-authors = [{name = "Helena Richie", email = "helenarichie@pitt.edu"}]
+authors = [{name = "Helena Richie", email = "helenarichie@gmail.com"}]
 # we should probably add version bounds
 dependencies = [
   'astropy',
   'numpy',
   'pandas',
-  'scipy'
+  'scipy >= 1.6.0',
+  'h5py'
 ]
 
 [project.urls]
