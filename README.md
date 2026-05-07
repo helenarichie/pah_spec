@@ -1,4 +1,4 @@
-# pah_spec
+# pah_spec usage
 pah_spec is a tool for fast, flexible computation of PAH emission spectra with the single photon approximation, as described in [Richie & Hensley (2026)](https://ui.adsabs.harvard.edu/abs/2025arXiv251016861R/abstract).
 
 
