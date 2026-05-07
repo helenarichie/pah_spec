@@ -1,4 +1,5 @@
-# `pah_spec`: a tool for fast, flexible computation of PAH emission spectra with the single photon approximation
+# pah_spec
+pah_spec is a tool for fast, flexible computation of PAH emission spectra with the single photon approximation, as described in [Richie & Hensley (2026)](https://ui.adsabs.harvard.edu/abs/2025arXiv251016861R/abstract).
 
 
 ## Installation
