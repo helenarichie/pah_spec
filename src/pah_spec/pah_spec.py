@@ -275,8 +275,8 @@ class PahSpec:
             PAH ionization to run basis spectra for, default is False
         lambda_min : astropy.units.Quantity, optional
             Lowest lambda_abs wavelength, recommended default is 912 A
-        Lambda_max : astropy.units.Quantity, optional
-            Highest lambda_abs wavelength, recommended default is 912 um
+        lambda_max : astropy.units.Quantity, optional
+            Highest lambda_abs wavelength, recommended default is 10 um
 
         Returns
         -------

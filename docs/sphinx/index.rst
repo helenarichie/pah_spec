@@ -3,19 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-pah_spec documentation
+pah_spec
 ======================
-
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+Welcome to the pah_spec documentation site! pah_spec is a tool for fast, flexible computation of PAH emission spectra 
+with the single photon approximation, as described in 
+`Richie & Hensley (2026) <https://ui.adsabs.harvard.edu/abs/2025arXiv251016861R/abstract>`_.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-.. automodule:: pah_spec
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   readme
+   api
