@@ -32,6 +32,17 @@ dependencies = [
 
 [project.urls]
 Homepage = 'https://github.com/helenarichie/pah_spec'
+Documentation = 'https://pah-spec.readthedocs.io/'
 Source = 'https://github.com/helenarichie/pah_spec'
 Tracker = 'https://github.com/helenarichie/pah_spec/issues'
 
+[dependency-groups]
+# these are development dependencies. They can be installed with pip (v25.1+)
+# by invoking `pip install --user --group dev` from the directory holding this
+# configuration file
+docs = [
+    'myst_parser',
+    'sphinx',
+    'sphinx_rtd_theme'
+]
+dev = [{include-group = "docs"}]
