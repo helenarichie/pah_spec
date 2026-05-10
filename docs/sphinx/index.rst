@@ -15,6 +15,7 @@ with the single photon approximation, as described in
 
    Introduction <self>
    readme
+   install
    api
    development
 
