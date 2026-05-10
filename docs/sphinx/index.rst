@@ -12,6 +12,23 @@ with the single photon approximation, as described in
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   :hidden:
 
+   Introduction <self>
    readme
    api
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Developement
+   :hidden:
+
+   writing-docs
+
+
+.. toctree::
+   :caption: Useful links
+   :hidden:
+
+   GitHub <https://github.com/helenarichie/pah_spec>
+   Issue Tracker <https://github.com/helenarichie/pah_spec/issues>

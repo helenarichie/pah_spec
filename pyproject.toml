@@ -17,7 +17,7 @@ license-files = ["LICENSE"]
 # detect the version number from the __version__ variable in _version.py
 dynamic = ["version"]
 # we may need to adjust the version bounds
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 description = "tool for generating PAH spectra with the single photon approximation"
 readme = "README.md"
 authors = [{name = "Helena Richie", email = "helenarichie@gmail.com"}]
@@ -43,6 +43,7 @@ Tracker = 'https://github.com/helenarichie/pah_spec/issues'
 docs = [
     'myst_parser',
     'sphinx',
+    'sphinx_inline_tabs',
     'sphinx_rtd_theme'
 ]
 dev = [{include-group = "docs"}]
