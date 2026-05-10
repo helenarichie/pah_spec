@@ -39,12 +39,3 @@ astropy, h5py, numpy, pandas, scipy. Tested with python 3.13.7, h5py 3.14.0, ast
 ## Examples:
 
 For instructions on code usage, see the examples in [examples/generate_spectrum_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_spectrum_example.ipynb) and [examples/generate_basis_spectra_example.ipynb](https://github.com/helenarichie/pah_spec/blob/main/examples/generate_basis_spectra_example.ipynb).
-
-
-## Development
-
-To run the tests, you should install ``pah_spec`` and then execute the following command from the root of the repository:
-
-```sh
-python -m unittest discover -s tests -p "pah_spec_test.py"
-```

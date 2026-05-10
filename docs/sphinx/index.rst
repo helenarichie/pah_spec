@@ -16,14 +16,7 @@ with the single photon approximation, as described in
    Introduction <self>
    readme
    api
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developement
-   :hidden:
-
-   writing-docs
-
+   development
 
 .. toctree::
    :caption: Useful links
