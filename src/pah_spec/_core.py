@@ -13,6 +13,8 @@ import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
+from ._data import DataKind, build_data_file_path
+
 __all__ = ["PahSpec", "calc_pah_energy", "GRAIN_SIZES"]
 
 
@@ -88,64 +90,83 @@ _THETA_STR_CH = 4360 * u.K  # C-H stretching mode Debye temperature
 
 _C_CGS = 2.99792e10  # speed of light
 
-# todo: use importlib.resource (or possibly pooch) to more properly handle datafiles
-# -> these paths are only valid in editable installations
-_SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))  # <- dir holding this file
-_BUILTIN_BASIS_DIR = os.path.join(_SOURCE_DIR, "../../data/basis_spectra")
-_BUILTIN_C_ABS_DATA_DIR = os.path.join(_SOURCE_DIR, "../../data/c_abs_data")
-_BUILTIN_DATA_DEFAULT_DIR = os.path.join(_SOURCE_DIR, "../../data/defaults/")
-
-
 class PahSpec:
-    """Class for generating PAH emission spectra with the single photon approximation"""
+    """Class for generating PAH emission spectra with the single photon approximation
 
-    def __init__(self, basis_directory=None, c_abs_data_directory=None):
-        if basis_directory is None:
-            basis_directory = _BUILTIN_BASIS_DIR
+    Parameters
+    ----------
+    basis_dir: path-like, optional
+        Specifies the path to the directory containing "basis_ion.h5" and
+        "basis_neu.h5" which store the desired basis spectra for the ionized
+        and neutral PAHs, respectively. When None (the default), basis spectra
+        are read from the appropriate data cache directory.
+    internal_data_dir: path-like, optional
+        Specifies the path to the directory holding internal data files. When
+        None (the default), these files are read from the appropriate data cache
+        directory. This is mostly provided for testing purposes (and should NOT
+        be considered part of the public API)
+    """
 
-        if c_abs_data_directory is None:
-            c_abs_data_directory = _BUILTIN_C_ABS_DATA_DIR
-
-        # Check if the cross section path exists
-        if not os.path.exists(c_abs_data_directory):
-            error_string = (
-                f"calc_cabs expects to find graphite_cabs.fits and draine21_Table4.dat at {c_abs_data_directory}, "
-                "but the path does not exist"
-            )
-            raise FileNotFoundError(error_string)
-        # Check if the basis spectra path exists
-        if not os.path.exists(basis_directory):
-            raise FileNotFoundError(
-                f"Exptected to find basis spectra at {basis_directory}, but the path does not exist"
-            )
+    def __init__(self, *, basis_dir=None, internal_data_dir=None):
 
         # Load the basis spectra into memory
-        with h5py.File(os.path.join(basis_directory, "basis_ion.h5"), "r") as f:
-            self.emission_wavelengths = f["lambda_em"] * u.um
-            self.photon_wavelengths = f["lambda_abs"] * u.um
-            self.basis_spectra_ion = f["basis_spectra"] * u.erg / (u.s * u.cm)
-        with h5py.File(os.path.join(basis_directory, "basis_neu.h5"), "r") as f:
-            self.basis_spectra_neu = f["basis_spectra"] * u.erg / (u.s * u.cm)
+        _data = {}
+        _dset_unit_pairs = [
+            ("lambda_em", "um"), ("lambda_abs", "um"), ("basis_spectra", "erg/(s*cm)")
+        ]
+        for fname in ["basis_ion.h5", "basis_neu.h5"]:
+            path = build_data_file_path(
+                kind=DataKind.SAMPLE_BASIS, fname=fname, override_path=basis_dir
+            )
+            _data[fname] = {"path": path}
+            with h5py.File(path, "r") as f:
+                for dset, unit in _dset_unit_pairs:
+                    _data[fname][dset] = u.Quantity(f[dset][...], unit=unit)
+
+        for dset in ("lambda_em", "lambda_abs"):
+            if not np.all(_data["basis_ion.h5"][dset] == _data["basis_neu.h5"][dset]):
+                raise ValueError(
+                    f"the {dset} datasets in {_data['basis_ion.h5']['path']!s} and "
+                    f"{_data['basis_neu.h5']['path']!s} are not identical"
+                )
+
+        self.emission_wavelengths = _data["basis_ion.h5"]["lambda_em"]
+        self.photon_wavelengths = _data["basis_ion.h5"]["lambda_abs"]
+        self.basis_spectra_ion = _data["basis_ion.h5"]["basis_spectra"]
+        self.basis_spectra_neu = _data["basis_neu.h5"]["basis_spectra"]
 
         # Load the cross section data into memory, TODO: should these be private attributes?
         # _lamj_tab units are um
+        draine_table_path = build_data_file_path(
+            kind=DataKind.INTERNAL_DATA,
+            fname="c_abs_data/draine21_Table4.dat",
+            override_path=internal_data_dir
+        )
         self._lamj_tab, self._gamj_tab, self._sigj_neu_tab, self._sigj_ion_tab, self._hc_tab = np.genfromtxt(
-            os.path.join(c_abs_data_directory, "draine21_Table4.dat"),
-            unpack=True,
+            fname=draine_table_path, unpack=True
         )
         self._sigj_neu_tab *= 1.0e-20  # units of cm
         self._sigj_ion_tab *= 1.0e-20  # units of cm
-        hdul = fits.open(os.path.join(c_abs_data_directory, "graphite_cabs.fits"))
-        # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
-        self._cabs_graphite_spl = interpolate.RectBivariateSpline(hdul[1].data, hdul[2].data, hdul[3].data)
-        hdul.close()
+
+        fits_path = build_data_file_path(
+            kind=DataKind.INTERNAL_DATA,
+            fname="c_abs_data/graphite_cabs.fits",
+            override_path=internal_data_dir
+        )
+        with fits.open(fits_path, mode="readonly") as hdul:
+            # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
+            self._cabs_graphite_spl = interpolate.RectBivariateSpline(
+                hdul[1].data, hdul[2].data, hdul[3].data
+            )
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
-        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist()
+        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
-        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field()
+        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(
+            internal_data_dir
+        )
 
     def generate_spectrum(self, wavelength_arr=None, u_lambda_arr=None, size_dist_neu=None, size_dist_ion=None):
         """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
@@ -1257,11 +1278,14 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     return photon_wavelengths
 
 
-def _read_size_dist(data_path=None):
-    # perhaps a non-None data_path value should be passed directly to pd.read_csv?
-    data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
+def _read_size_dist(internal_data_dir=None):
+    path = build_data_file_path(
+        kind=DataKind.INTERNAL_DATA,
+        fname="defaults/pahspec_dnda.out_st_std",
+        override_path=internal_data_dir
+    )
 
-    df = pd.read_csv(os.path.join(data_path, "pahspec_dnda.out_st_std"), sep="\\s+", skiprows=1)
+    df = pd.read_csv(path, sep="\\s+", skiprows=1)
     rad = df["rad"].to_numpy() * u.um
     size_dist_neu = df["dn_{PAH0}"].to_numpy()
     size_dist_ion = df["dn_{PAH+}"].to_numpy()
@@ -1269,11 +1293,14 @@ def _read_size_dist(data_path=None):
     return rad, size_dist_neu, size_dist_ion
 
 
-def _read_radiation_field(data_path=None):
-    # perhaps a non-None data_path value should be passed directly to pd.read_csv?
-    data_path = _BUILTIN_DATA_DEFAULT_DIR if data_path is None else data_path
+def _read_radiation_field(internal_data_dir=None):
+    path = build_data_file_path(
+        kind=DataKind.INTERNAL_DATA,
+        fname="defaults/isrf_mmpisrf_0.00",
+        override_path=internal_data_dir
+    )
 
-    df = pd.read_csv(os.path.join(data_path, "isrf_mmpisrf_0.00"), sep="\\s+", skiprows=6)
+    df = pd.read_csv(path, sep="\\s+", skiprows=6)
     wavelength_arr_u = df["(um)"].to_numpy() * u.um
     u_lambda_arr = df["(erg"].to_numpy() * (u.erg / u.cm**3) / wavelength_arr_u.to(u.cm)
 

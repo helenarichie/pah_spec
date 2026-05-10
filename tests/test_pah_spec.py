@@ -10,6 +10,8 @@ from scipy.integrate import trapezoid
 
 import pah_spec  # pylint: disable=wrong-import-position
 
+_INTERNAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+
 # Set tolerance for disagreement to 5%
 TOLERANCE = 0.05
 
@@ -39,7 +41,10 @@ def test_total_power(basic_scenario: Scenario):
     # basic_scenario is an instance of the Scenario type that was constructed by
     # the basic_scenario fixture function
 
-    ps = pah_spec.PahSpec(basis_directory=basic_scenario.basis_path)
+    ps = pah_spec.PahSpec(
+        basis_dir=basic_scenario.basis_path,
+        internal_data_dir = _INTERNAL_DATA_DIR
+    )
     actual_spectrum_neu, actual_spectrum_ion = ps.generate_spectrum()
 
     actual_power_neu = trapezoid(actual_spectrum_neu, x=ps.emission_wavelengths.to(u.cm))
@@ -69,7 +74,10 @@ def test_spectral_shape(basic_scenario: Scenario):
     # basic_scenario is an instance of the Scenario type that was constructed by
     # the basic_scenario fixture function
 
-    ps = pah_spec.PahSpec(basis_directory=basic_scenario.basis_path)
+    ps = pah_spec.PahSpec(
+        basis_dir=basic_scenario.basis_path,
+        internal_data_dir = _INTERNAL_DATA_DIR
+    )
     actual_spectrum_neu, actual_spectrum_ion = ps.generate_spectrum()
 
     assert compare_spectra(
