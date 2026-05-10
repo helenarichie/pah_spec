@@ -1,20 +1,22 @@
-.. pah_spec documentation master file, created by
-   sphinx-quickstart on Thu May  7 11:38:12 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Here, we directly embed the contents of the README
+   -> while it's okay right now to directly embed the entire README in this file
+      we may change our mind in the future
+   -> unforuntately, the myst_parser is fundamentally incompatible with including
+      fragments that don't start with a `# header`. The parser is incompatible
+      with starting with say a `## header`.
+   -> so, if this ever comes up, we'll just need to duplicate contents OR
+      convert the README to a .rst file (which GitHub definitely understands)
 
-pah_spec
-======================
-Welcome to the pah_spec documentation site! pah_spec is a tool for fast, flexible computation of PAH emission spectra 
-with the single photon approximation, as described in 
-`Richie & Hensley (2026) <https://ui.adsabs.harvard.edu/abs/2025arXiv251016861R/abstract>`_.
+.. include:: ../../README.md
+   :parser: myst_parser.sphinx_
+
+.. Down below, we list contents (that populate the sidebar)
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
    Introduction <self>
-   readme
    install
    api
    development
@@ -25,3 +27,6 @@ with the single photon approximation, as described in
 
    GitHub <https://github.com/helenarichie/pah_spec>
    Issue Tracker <https://github.com/helenarichie/pah_spec/issues>
+
+.. Down below we describe information for the landing page of the website.
+
