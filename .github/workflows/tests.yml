@@ -23,5 +23,8 @@ jobs:
       - name: Install pah_spec package
         run: pip install -e .
 
+      - name: Install testing dependencies
+        run: pip install --group test
+
       - name: Run tests
-        run: python -m unittest discover -s tests -p "pah_spec_test.py"
+        run: pytest
