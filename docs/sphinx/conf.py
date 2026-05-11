@@ -3,18 +3,27 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import pah_spec
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "pah_spec"
 copyright = "2026, Helena Richie"
 author = "Helena Richie"
-release = "1.0"
+release = pah_spec.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx.ext.viewcode", "myst_parser"]
+extensions = [
+    "myst_parser",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx_inline_tabs"
+]
+source_suffix = [".rst", ".md"]
+
 napoleon_numpy_docstring = True
 html_theme = "sphinx_rtd_theme"
 
@@ -32,4 +41,9 @@ autodoc_default_options = {
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_static_path = ["_static"]
+#html_static_path = ["_static"]
+
+# -- Options for MyST --------------------------------------------------------
+
+myst_enable_extensions = ["colon_fence"]
+

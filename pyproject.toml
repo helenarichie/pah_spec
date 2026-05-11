@@ -12,11 +12,12 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "pah_spec"
-version = "0.1"
 license = "MIT"
 license-files = ["LICENSE"]
+# detect the version number from the __version__ variable in _version.py
+dynamic = ["version"]
 # we may need to adjust the version bounds
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 description = "tool for generating PAH spectra with the single photon approximation"
 readme = "README.md"
 authors = [{name = "Helena Richie", email = "helenarichie@gmail.com"}]
@@ -31,6 +32,18 @@ dependencies = [
 
 [project.urls]
 Homepage = 'https://github.com/helenarichie/pah_spec'
+Documentation = 'https://pah-spec.readthedocs.io/'
 Source = 'https://github.com/helenarichie/pah_spec'
 Tracker = 'https://github.com/helenarichie/pah_spec/issues'
 
+[dependency-groups]
+# these are development dependencies. They can be installed with pip (v25.1+)
+# by invoking `pip install --user --group dev` from the directory holding this
+# configuration file
+docs = [
+    'myst_parser',
+    'sphinx',
+    'sphinx_inline_tabs',
+    'sphinx_rtd_theme'
+]
+dev = [{include-group = "docs"}]

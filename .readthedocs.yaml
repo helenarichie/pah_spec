@@ -5,8 +5,8 @@ build:
     python: "3.13"
 sphinx:
   configuration: docs/sphinx/conf.py
-python:
+jobs:
   install:
-    - method: pip
-      path: .
-    - requirements: docs/requirements.txt
+    - python -m pip install --upgrade pip
+    - pip install --group 'docs' # install doc-dependencies
+    - pip install . # install pah_spec - needed (I think) to generate API docs
