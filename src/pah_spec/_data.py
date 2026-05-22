@@ -267,7 +267,10 @@ def add_data_cli_subcommands(subparsers: Any):
         else:
             kinds = [DataKind(args.kind)]
         for kind in kinds:
-            print(f"\ndownloading {kind._value_} data (if not already downloaded):")
+            print(
+                f"\nchecking for {kind._value_} data "
+                "(it will be downloaded, if not present)"
+            )
             _retrieve_data(path=path, kind=kind)
         return 0
 
