@@ -118,7 +118,7 @@ In order to fully uninstall ``pah_spec``, you need to manually delete the data f
 You can find these directories by invoking the following command from the commandline
 
 ```shell-session
-$ python -m "pah_spec" download --to-cache KIND
+$ python -m "pah_spec" show-cache
 ```
 
 Of course, to uninstall ``pah_spec`` you can invoke
