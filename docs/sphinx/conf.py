@@ -21,7 +21,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
-    "sphinx_inline_tabs"
+    "sphinx_inline_tabs",
 ]
 source_suffix = [".rst", ".md"]
 
@@ -42,13 +42,13 @@ autodoc_default_options = {
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-#html_static_path = ["_static"]
+# html_static_path = ["_static"]
 
 # -- Options for intersphinx -------------------------------------------------
 intersphinx_mapping = {
     "CPython": ("https://docs.python.org/3", None),
     "astropy": ("http://docs.astropy.org/en/stable", None),
-    "pooch": ("https://www.fatiando.org/pooch/latest/", None)
+    "pooch": ("https://www.fatiando.org/pooch/latest/", None),
 }
 
 # Recommended by readthedocsadding the following config value.
@@ -62,4 +62,3 @@ intersphinx_disabled_reftypes = ["*"]
 # -- Options for MyST --------------------------------------------------------
 
 myst_enable_extensions = ["colon_fence", "fieldlist"]
-

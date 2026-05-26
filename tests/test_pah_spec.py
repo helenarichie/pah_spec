@@ -15,6 +15,7 @@ _INTERNAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 # Set tolerance for disagreement to 5%
 TOLERANCE = 0.05
 
+
 @dataclass
 class Scenario:
     # aggregates basic information about the test scenario case
@@ -23,18 +24,24 @@ class Scenario:
     golden_spectrum_ion: u.Quantity
     basis_path: str
 
+
 @pytest.fixture
 def basic_scenario() -> Scenario:
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    golden_path = os.path.normpath(os.path.join(test_dir, "../data/test_data/pah_spec_golden.csv"))
+    golden_path = os.path.normpath(
+        os.path.join(test_dir, "../data/test_data/pah_spec_golden.csv")
+    )
     goldens = np.loadtxt(golden_path, delimiter=",", skiprows=1)
 
     return Scenario(
-        golden_wavelength_arr = goldens[:, 0] * u.um,
-        golden_spectrum_neu = goldens[:, 1] * u.erg / (u.cm * u.s),
-        golden_spectrum_ion = goldens[:, 2] * u.erg / (u.cm * u.s),
-        basis_path = os.path.normpath(os.path.join(test_dir, "../data/test_data/basis_spectra_low_res/"))
+        golden_wavelength_arr=goldens[:, 0] * u.um,
+        golden_spectrum_neu=goldens[:, 1] * u.erg / (u.cm * u.s),
+        golden_spectrum_ion=goldens[:, 2] * u.erg / (u.cm * u.s),
+        basis_path=os.path.normpath(
+            os.path.join(test_dir, "../data/test_data/basis_spectra_low_res/")
+        ),
     )
+
 
 def test_total_power(basic_scenario: Scenario):
     """Check that integrated spectral power matches goldens for neutral and ionized PAHs."""
@@ -42,23 +49,32 @@ def test_total_power(basic_scenario: Scenario):
     # the basic_scenario fixture function
 
     ps = pah_spec.PahSpec(
-        basis_dir=basic_scenario.basis_path,
-        internal_data_dir = _INTERNAL_DATA_DIR
+        basis_dir=basic_scenario.basis_path, internal_data_dir=_INTERNAL_DATA_DIR
     )
     actual_spectrum_neu, actual_spectrum_ion = ps.generate_spectrum()
 
-    actual_power_neu = trapezoid(actual_spectrum_neu, x=ps.emission_wavelengths.to(u.cm))
-    actual_power_ion = trapezoid(actual_spectrum_ion, x=ps.emission_wavelengths.to(u.cm))
+    actual_power_neu = trapezoid(
+        actual_spectrum_neu, x=ps.emission_wavelengths.to(u.cm)
+    )
+    actual_power_ion = trapezoid(
+        actual_spectrum_ion, x=ps.emission_wavelengths.to(u.cm)
+    )
 
-    expected_power_neu = trapezoid(basic_scenario.golden_spectrum_neu, x=basic_scenario.golden_wavelength_arr.to(u.cm))
-    expected_power_ion = trapezoid(basic_scenario.golden_spectrum_ion, x=basic_scenario.golden_wavelength_arr.to(u.cm))
+    expected_power_neu = trapezoid(
+        basic_scenario.golden_spectrum_neu,
+        x=basic_scenario.golden_wavelength_arr.to(u.cm),
+    )
+    expected_power_ion = trapezoid(
+        basic_scenario.golden_spectrum_ion,
+        x=basic_scenario.golden_wavelength_arr.to(u.cm),
+    )
 
     np.testing.assert_allclose(
         actual_power_neu.value,
         desired=expected_power_neu.value,
         atol=0.0,
         rtol=TOLERANCE,
-        err_msg=f"Integrated PAH0 spectral power differs by more than {TOLERANCE*100}%"
+        err_msg=f"Integrated PAH0 spectral power differs by more than {TOLERANCE * 100}%",
     )
 
     np.testing.assert_allclose(
@@ -66,8 +82,9 @@ def test_total_power(basic_scenario: Scenario):
         desired=expected_power_ion.value,
         atol=0.0,
         rtol=TOLERANCE,
-        err_msg=f"Integrated PAH+ spectral power differs by more than {TOLERANCE*100}%"
+        err_msg=f"Integrated PAH+ spectral power differs by more than {TOLERANCE * 100}%",
     )
+
 
 def test_spectral_shape(basic_scenario: Scenario):
     """Check that spectral shapes are almost equal for neutral and ionized PAHs."""
@@ -75,14 +92,15 @@ def test_spectral_shape(basic_scenario: Scenario):
     # the basic_scenario fixture function
 
     ps = pah_spec.PahSpec(
-        basis_dir=basic_scenario.basis_path,
-        internal_data_dir = _INTERNAL_DATA_DIR
+        basis_dir=basic_scenario.basis_path, internal_data_dir=_INTERNAL_DATA_DIR
     )
     actual_spectrum_neu, actual_spectrum_ion = ps.generate_spectrum()
 
     assert compare_spectra(
-        ps.emission_wavelengths.value, actual_spectrum_neu.value,
-        basic_scenario.golden_wavelength_arr.value, basic_scenario.golden_spectrum_neu.value
+        ps.emission_wavelengths.value,
+        actual_spectrum_neu.value,
+        basic_scenario.golden_wavelength_arr.value,
+        basic_scenario.golden_spectrum_neu.value,
     ), "PAH0 spectra disagree"
 
 
@@ -120,9 +138,11 @@ def compare_spectra(x_actual, y_actual, x_golden, y_golden):
     y_actual_interp = np.interp(x_common, x_actual, y_actual)
 
     n_points = len(x_common)
-    n_outliers = sum(not isclose(a, b, rel_tol=TOLERANCE) for a, b in zip(y_actual_interp, y_golden_interp))
+    n_outliers = sum(
+        not isclose(a, b, rel_tol=TOLERANCE)
+        for a, b in zip(y_actual_interp, y_golden_interp)
+    )
 
     outlier_fraction = 0.05
 
     return (n_outliers / n_points) <= outlier_fraction
-
