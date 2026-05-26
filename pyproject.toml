@@ -17,7 +17,7 @@ license-files = ["LICENSE"]
 # detect the version number from the __version__ variable in _version.py
 dynamic = ["version"]
 # we may need to adjust the version bounds
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 description = "tool for generating PAH spectra with the single photon approximation"
 readme = "README.md"
 authors = [{name = "Helena Richie", email = "helenarichie@gmail.com"}]
