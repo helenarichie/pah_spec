@@ -2,13 +2,13 @@
 # here we specify the build-backend. For context:
 # - tools like pip and uv are example of build-frontends. Users directly
 #   interact with the frontend
-# - tools like setuptools, hatchling, scikit-build-core, meson-python are all
+# - tools like setuptools, flit, scikit-build-core, meson-python are all
 #   examples of build backends
 requires = [
-    # the version bound is recommended in the docs
-    "flit_core >=3.11,<4"
+    # the version bound follows modern conventions for license & license-files
+    "hatchling>=1.26",
 ]
-build-backend = "flit_core.buildapi"
+build-backend = "hatchling.build"
 
 [project]
 name = "pah_spec"
@@ -70,6 +70,12 @@ docs = [
 ]
 test = ["pytest"]
 dev = [{include-group = "docs"}, {include-group = "test"}]
+
+[tool.hatch.version]
+# provide instructions to the build-backend about where it should search for
+# the version number
+path = "src/pah_spec/_version.py"
+pattern = '__version__: str = "(?P<version>[^"]+)"'
 
 # configure pytest
 [tool.pytest.ini_options]
