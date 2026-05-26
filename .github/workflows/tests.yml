@@ -2,13 +2,24 @@ name: Run Tests
 
 on:
   push:
-    branches: [main, kute]
+    branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+  #        ┌───────────── minute (0 - 59)
+  #        │  ┌───────────── hour (0 - 23)
+  #        │  │  ┌───────────── day of the month (1 - 31)
+  #        │  │  │ ┌───────────── month (1 - 12 or JAN-DEC)
+  #        │  │  │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+  #        │  │  │ │ │
+  - cron: 30 07 * * MON
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15-dev']
 
     steps:
       - name: Check out code
@@ -17,14 +28,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       # the "-e" flag instructs the package to be installed in editable mode
-      - name: Install pah_spec package
-        run: pip install -e .
-
-      - name: Install testing dependencies
-        run: pip install --group test
+      - name: Install test-dependencies and pah_spec
+        run: |
+          # upgrade pip
+          python -m pip install --upgrade pip
+          # install the test-dependencies
+          python -m pip install --group test
+          # install the package itself
+          # (after GH PR #6 is merged, we won't need an editable install)
+          python -m pip install -e .
 
       - name: Run tests
         run: pytest
