@@ -142,13 +142,6 @@ class PahSpec:
         spectrum_ion : astropy.units.Quantity (array_like)
             PAH+ size- and ionization-integrated spectrum for grains heated by the input u_lambda
             (in u.erg / (u.cm * u.s))
-
-        Raises
-        ------
-        AttributeError
-            If the input is not an astropy.units.Quantity object
-        TypeError
-            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
         # If the radiation field, size distribution, or ionization function is not specified, then use the defaults
         if wavelength_arr is None:
@@ -249,13 +242,6 @@ class PahSpec:
         Returns
         -------
         None
-
-        Raises
-        ------
-        AttributeError
-            If the input is not an astropy.units.Quantity object
-        TypeError
-            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
         # TODO: add cross-section argument
         grain_sizes = _check_param(grain_sizes, u.AA, force_iterable=True)
@@ -359,13 +345,6 @@ class PahSpec:
             Array with C_abs values for ionized grains (in u.cm ** 2)
         c_abs_neu_out : astropy.units.Quantity (array_like)
             Array with C_abs values for neutral grains (in u.cm ** 2)
-
-        Raises
-        ------
-        AttributeError
-            If the input is not an astropy.units.Quantity object
-        TypeError
-            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
         # TODO: check that grain does not exceed maximum allowed size
 
@@ -399,13 +378,6 @@ class PahSpec:
             Array with C_abs values for ionized grains (in cm**2)
         c_abs_neu_out : numpy.ndarray
             Array with C_abs values for neutral grains (in cm**2)
-
-        Raises
-        ------
-        AttributeError
-            If the input is not an astropy.units.Quantity object
-        TypeError
-            If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
         """
 
         nc = _calc_nc(radius_arr * u.AA)
@@ -710,13 +682,6 @@ def calc_pah_energy(grain_radius, temp_arr):
     -------
     energy_arr : astropy.units.Quantity (array-like)
         Resulting PAH energy array (in u.erg)
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     radius_unit, temp_unit = u.AA, u.K
     _check_param(grain_radius, radius_unit)
@@ -774,13 +739,6 @@ def _calc_pah_energy_debye(temp_arr, nh, nm_cc_ip, nm_cc_op):
     -------
     energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     _check_param(temp_arr, u.K, iterable=True)
 
@@ -849,13 +807,6 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
     -------
     energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     _check_param(temp_arr, u.K, iterable=True)
 
@@ -932,13 +883,6 @@ def _calc_pah_cooling(
         Array with time values for T(t) (in u.s)
     temp_arr_out : astropy.units.Quantity (array_like)
         Array with temperature values for T(t) (in u.K)
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = (
         u.um,
@@ -1030,13 +974,6 @@ def _calc_pah_cooling_discrete(
         Array with time values for T(t) (in u.s)
     temp_arr_out : astropy.units.Quantity (array_like)
         Array with temperature values for T(t) (at the energy bin edges, in u.K)
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = (
         u.um,
@@ -1195,13 +1132,6 @@ def _calc_basis_vector(
     -------
     basis_vector : astropy.units.Quantity (array_like)
         Array of floats of length len(wavelength_arr) with basis vector for a given grain (in u.erg / (u.cm * u.s))
-
-    Raises
-    ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
-    TypeError
-        If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
     wavelength_unit, temp_unit, c_abs_unit = u.um, u.K, u.cm**2
     _check_param(lambda_abs, wavelength_unit)
@@ -1357,22 +1287,19 @@ def _check_param(param, unit, iterable=False, force_iterable=False):
 
     Raises
     ------
-    AttributeError
-        If the input is not an astropy.units.Quantity object
     TypeError
+        If the input is not an astropy.units.Quantity object
+    ValueError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    try:
-        param.value
-    except AttributeError:
-        raise AttributeError(f"expects astropy.units.Quantity objects of unit {unit}")
+    if not isinstance(param, u.Quantity):
+        raise TypeError(f"expects astropy.units.Quantity objects of unit {unit}")
 
     if param.unit != unit:
-        raise TypeError(f"parameter expects units of {unit}")
+        raise ValueError(f"parameter expects units of {unit}")
 
-    if iterable:
-        if not isinstance(param.value, (list, tuple, np.ndarray)):
-            raise TypeError("expects array-like input")
+    if iterable and (not isinstance(param.value, (list, tuple, np.ndarray))):
+        raise TypeError("expects array-like input")
 
     if force_iterable:
         if not isinstance(param.value, (list, tuple, np.ndarray)):
