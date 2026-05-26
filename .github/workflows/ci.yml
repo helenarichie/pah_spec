@@ -1,0 +1,46 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+  #        ┌───────────── minute (0 - 59)
+  #        │  ┌───────────── hour (0 - 23)
+  #        │  │  ┌───────────── day of the month (1 - 31)
+  #        │  │  │ ┌───────────── month (1 - 12 or JAN-DEC)
+  #        │  │  │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+  #        │  │  │ │ │
+  - cron: 30 07 * * MON
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      # each variation runs to completion (don't stop if another variant fails)
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # the "-e" flag instructs the package to be installed in editable mode
+      - name: Install test-dependencies and pah_spec
+        run: |
+          # upgrade pip
+          python -m pip install --upgrade pip
+          # install the test-dependencies
+          python -m pip install --group test
+          # install the package itself
+          python -m pip install .
+
+      - name: Run tests
+        run: pytest
