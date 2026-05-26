@@ -21,6 +21,26 @@ requires-python = ">=3.8"
 description = "tool for generating PAH spectra with the single photon approximation"
 readme = "README.md"
 authors = [{name = "Helena Richie", email = "helenarichie@gmail.com"}]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Unix",
+  "Natural Language :: English",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Topic :: Scientific/Engineering :: Physics",
+]
 # we should probably add version bounds
 dependencies = [
   'astropy',
