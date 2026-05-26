@@ -56,7 +56,9 @@ class PahSpec:
             ("grain_sizes", "Angstrom"),
         ]
         for fname in ["basis_ion.h5", "basis_neu.h5"]:
-            path = build_data_file_path(kind=DataKind.SAMPLE_BASIS, fname=fname, override_path=basis_dir)
+            path = build_data_file_path(
+                kind=DataKind.SAMPLE_BASIS, fname=fname, override_path=basis_dir
+            )
             _data[fname] = {"path": path}
             with h5py.File(path, "r") as f:
                 for dset, unit in _dset_unit_pairs:
@@ -99,14 +101,18 @@ class PahSpec:
         )
         with fits.open(fits_path, mode="readonly") as hdul:
             # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
-            self._cabs_graphite_spl = interpolate.RectBivariateSpline(hdul[1].data, hdul[2].data, hdul[3].data)
+            self._cabs_graphite_spl = interpolate.RectBivariateSpline(
+                hdul[1].data, hdul[2].data, hdul[3].data
+            )
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
         _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
-        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(internal_data_dir)
+        self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(
+            internal_data_dir
+        )
 
     def generate_spectrum(
         self,

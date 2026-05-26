@@ -19,4 +19,9 @@ from ._data import retrieve_internal_data, retrieve_sample_basis
 # -> we import using `as` to silence the ruff warning that __version__ is unused
 from ._version import __version__ as __version__
 
-__all__ = ["PahSpec", "calc_pah_energy", "retrieve_internal_data", "retrieve_sample_basis"]
+__all__ = [
+    "PahSpec",
+    "calc_pah_energy",
+    "retrieve_internal_data",
+    "retrieve_sample_basis",
+]
