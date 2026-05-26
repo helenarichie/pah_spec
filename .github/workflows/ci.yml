@@ -40,8 +40,7 @@ jobs:
           # install the test-dependencies
           python -m pip install --group test
           # install the package itself
-          # (after GH PR #6 is merged, we won't need an editable install)
-          python -m pip install -e .
+          python -m pip install .
 
       - name: Run tests
         run: pytest
