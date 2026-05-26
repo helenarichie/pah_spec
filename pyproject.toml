@@ -27,7 +27,9 @@ dependencies = [
   'numpy',
   'pandas',
   'scipy >= 1.6.0',
-  'h5py'
+  'h5py',
+  # we may need to bumpy the lower limit
+  'pooch >= 1.1, <2'
 ]
 
 [project.urls]

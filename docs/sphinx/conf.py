@@ -19,6 +19,7 @@ release = pah_spec.__version__
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx_inline_tabs"
 ]
@@ -43,7 +44,22 @@ autodoc_default_options = {
 
 #html_static_path = ["_static"]
 
+# -- Options for intersphinx -------------------------------------------------
+intersphinx_mapping = {
+    "CPython": ("https://docs.python.org/3", None),
+    "astropy": ("http://docs.astropy.org/en/stable", None),
+    "pooch": ("https://www.fatiando.org/pooch/latest/", None)
+}
+
+# Recommended by readthedocsadding the following config value.
+# Sphinx defaults to automatically resolve *unresolved* labels using Intersphinx
+# mappings. This behavior has unintended side-effects, namely that documentations local
+# references can suddenly resolve to an external location.
+# See also:
+# https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html#confval-intersphinx_disabled_reftypes
+intersphinx_disabled_reftypes = ["*"]
+
 # -- Options for MyST --------------------------------------------------------
 
-myst_enable_extensions = ["colon_fence"]
+myst_enable_extensions = ["colon_fence", "fieldlist"]
 
