@@ -15,70 +15,8 @@ from scipy import interpolate
 
 from ._data import DataKind, build_data_file_path
 
-__all__ = ["PahSpec", "calc_pah_energy", "GRAIN_SIZES"]
+__all__ = ["PahSpec", "calc_pah_energy"]
 
-
-GRAIN_SIZES = [
-    3.5481e-04,
-    3.7584e-04,
-    3.9811e-04,
-    4.2170e-04,
-    4.4668e-04,
-    4.7315e-04,
-    5.0119e-04,
-    5.3088e-04,
-    5.6234e-04,
-    5.9566e-04,
-    6.3096e-04,
-    6.6834e-04,
-    7.0795e-04,
-    7.4989e-04,
-    7.9433e-04,
-    8.4140e-04,
-    8.9125e-04,
-    9.4406e-04,
-    1.0000e-03,
-    1.0593e-03,
-    1.1220e-03,
-    1.1885e-03,
-    1.2589e-03,
-    1.3335e-03,
-    1.4125e-03,
-    1.4962e-03,
-    1.5849e-03,
-    1.6788e-03,
-    1.7783e-03,
-    1.8836e-03,
-    1.9953e-03,
-    2.1135e-03,
-    2.2387e-03,
-    2.3714e-03,
-    2.5119e-03,
-    2.6607e-03,
-    2.8184e-03,
-    2.9854e-03,
-    3.1623e-03,
-    3.3497e-03,
-    3.5481e-03,
-    3.7584e-03,
-    3.9811e-03,
-    4.2170e-03,
-    4.4668e-03,
-    4.7315e-03,
-    5.0119e-03,
-    5.3088e-03,
-    5.6234e-03,
-    5.9566e-03,
-    6.3096e-03,
-    6.683e-03,
-    7.079e-03,
-    7.499e-03,
-    7.943e-03,
-    8.414e-03,
-    8.913e-03,
-    9.441e-03,
-    1.00e-02,
-] * u.um
 
 _DELTA_LAMBDA = 0.01
 
@@ -115,6 +53,7 @@ class PahSpec:
             ("lambda_em", "um"),
             ("lambda_abs", "um"),
             ("basis_spectra", "erg/(s*cm)"),
+            ("grain_sizes", "Angstrom"),
         ]
         for fname in ["basis_ion.h5", "basis_neu.h5"]:
             path = build_data_file_path(
@@ -125,7 +64,7 @@ class PahSpec:
                 for dset, unit in _dset_unit_pairs:
                     _data[fname][dset] = u.Quantity(f[dset][...], unit=unit)
 
-        for dset in ("lambda_em", "lambda_abs"):
+        for dset in ("lambda_em", "lambda_abs", "grain_sizes"):
             if not np.all(_data["basis_ion.h5"][dset] == _data["basis_neu.h5"][dset]):
                 raise ValueError(
                     f"the {dset} datasets in {_data['basis_ion.h5']['path']!s} and "
@@ -134,6 +73,7 @@ class PahSpec:
 
         self.emission_wavelengths = _data["basis_ion.h5"]["lambda_em"]
         self.photon_wavelengths = _data["basis_ion.h5"]["lambda_abs"]
+        self.grain_sizes = _data["basis_ion.h5"]["grain_sizes"]
         self.basis_spectra_ion = _data["basis_ion.h5"]["basis_spectra"]
         self.basis_spectra_neu = _data["basis_neu.h5"]["basis_spectra"]
 
@@ -190,9 +130,9 @@ class PahSpec:
         u_lambda_arr : astropy.units.Quantity (array_like), optional
             Array of length len(wavelength_arr) with the radiation field (in u.erg / u.cm ** 4)
         size_dist_neu : array_like, optional
-            PAH0 size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+            PAH0 size distribution and ionization function for each grain size in self.grain_sizes
         size_dist_ion : array_like, optional
-            PAH+ size distribution and ionization function for each grain size in pah_spec.GRAIN_SIZES
+            PAH+ size distribution and ionization function for each grain size in self.grain_sizes
 
         Returns
         -------
@@ -226,11 +166,11 @@ class PahSpec:
         basis_spectrum_unit = u.erg / (u.cm * u.s)
 
         spectra_neu_a = (
-            np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths)))
+            np.zeros((len(self.grain_sizes), len(self.emission_wavelengths)))
             * basis_spectrum_unit
         )
         spectra_ion_a = (
-            np.zeros((len(GRAIN_SIZES), len(self.emission_wavelengths)))
+            np.zeros((len(self.grain_sizes), len(self.emission_wavelengths)))
             * basis_spectrum_unit
         )
 
@@ -242,7 +182,7 @@ class PahSpec:
         _check_param(self.basis_spectra_neu, basis_spectrum_unit, iterable=True)
         _check_param(self.basis_spectra_ion, basis_spectrum_unit, iterable=True)
 
-        for i, grain_radius in enumerate(GRAIN_SIZES):
+        for i, grain_radius in enumerate(self.grain_sizes):
             # Remove units from arguments to call _scale_basis_spectra()
             spectra_neu_a[i] = (
                 np.sum(
@@ -275,8 +215,8 @@ class PahSpec:
                 )
             ) * basis_spectrum_unit  # manually set units of the function output
 
-        spectrum_neu = _size_integrate(spectra_neu_a, size_dist_neu)
-        spectrum_ion = _size_integrate(spectra_ion_a, size_dist_ion)
+        spectrum_neu = _size_integrate(self.grain_sizes, spectra_neu_a, size_dist_neu)
+        spectrum_ion = _size_integrate(self.grain_sizes, spectra_ion_a, size_dist_ion)
 
         return spectrum_neu, spectrum_ion
 
@@ -768,7 +708,7 @@ def calc_pah_energy(grain_radius, temp_arr):
 
     Returns
     -------
-    energy_arr : astropy.units.Quantity (array_like)
+    energy_arr : astropy.units.Quantity (array-like)
         Resulting PAH energy array (in u.erg)
 
     Raises
@@ -1502,10 +1442,10 @@ def _read_radiation_field(internal_data_dir=None):
     return wavelength_arr_u, u_lambda_arr
 
 
-def _size_integrate(scaled_basis_spectra, size_dist):
+def _size_integrate(grain_sizes, scaled_basis_spectra, size_dist):
     # Assumes size_dist acounts for size distribution and ionization function
-    weighted_spectra = np.zeros((len(GRAIN_SIZES), len(scaled_basis_spectra[0])))
-    for i, _ in enumerate(GRAIN_SIZES):
+    weighted_spectra = np.zeros((len(grain_sizes), len(scaled_basis_spectra[0])))
+    for i, _ in enumerate(grain_sizes):
         weighted_spectra[i] = size_dist[i] * scaled_basis_spectra[i].value
 
     size_integrated_spectrum = (
