@@ -53,7 +53,8 @@ class PahSpec:
         _dset_unit_pairs = [
             ("lambda_em", "um"),
             ("lambda_abs", "um"),
-            ("basis_spectra", "erg/(s*cm)", ("grain_sizes", "Angstrom")),
+            ("basis_spectra", "erg/(s*cm)"),
+            ("grain_sizes", "Angstrom"),
         ]
         for fname in ["basis_ion.h5", "basis_neu.h5"]:
             path = build_data_file_path(kind=DataKind.SAMPLE_BASIS, fname=fname, override_path=basis_dir)
@@ -71,6 +72,7 @@ class PahSpec:
 
         self.emission_wavelengths = _data["basis_ion.h5"]["lambda_em"]
         self.photon_wavelengths = _data["basis_ion.h5"]["lambda_abs"]
+        self.grain_sizes = _data["basis_ion.h5"]["grain_sizes"]
         self.basis_spectra_ion = _data["basis_ion.h5"]["basis_spectra"]
         self.basis_spectra_neu = _data["basis_neu.h5"]["basis_spectra"]
 
