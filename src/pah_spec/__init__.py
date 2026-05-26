@@ -11,7 +11,6 @@ cross-sections (:py:func:`calc_pah_energy` and :py:meth:`PahSpec.calc_c_abs`, re
 and Draine et al. (2021).
 """
 
-
 from ._core import PahSpec, calc_pah_energy, GRAIN_SIZES
 from ._data import retrieve_internal_data, retrieve_sample_basis
 
@@ -25,5 +24,5 @@ __all__ = [
     "calc_pah_energy",
     "GRAIN_SIZES",
     "retrieve_internal_data",
-    "retrieve_sample_basis"
+    "retrieve_sample_basis",
 ]
