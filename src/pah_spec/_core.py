@@ -47,7 +47,6 @@ class PahSpec:
     """
 
     def __init__(self, *, basis_dir=None, internal_data_dir=None):
-
         # Load the basis spectra into memory
         _data = {}
         _dset_unit_pairs = [
@@ -79,16 +78,24 @@ class PahSpec:
         # Load the cross section data into memory, TODO: should these be private attributes?
         # _lamj_tab units are um
         draine_table_path = build_data_file_path(
-            kind=DataKind.INTERNAL_DATA, fname="c_abs_data/draine21_Table4.dat", override_path=internal_data_dir
+            kind=DataKind.INTERNAL_DATA,
+            fname="c_abs_data/draine21_Table4.dat",
+            override_path=internal_data_dir,
         )
-        self._lamj_tab, self._gamj_tab, self._sigj_neu_tab, self._sigj_ion_tab, self._hc_tab = np.genfromtxt(
-            fname=draine_table_path, unpack=True
-        )
+        (
+            self._lamj_tab,
+            self._gamj_tab,
+            self._sigj_neu_tab,
+            self._sigj_ion_tab,
+            self._hc_tab,
+        ) = np.genfromtxt(fname=draine_table_path, unpack=True)
         self._sigj_neu_tab *= 1.0e-20  # units of cm
         self._sigj_ion_tab *= 1.0e-20  # units of cm
 
         fits_path = build_data_file_path(
-            kind=DataKind.INTERNAL_DATA, fname="c_abs_data/graphite_cabs.fits", override_path=internal_data_dir
+            kind=DataKind.INTERNAL_DATA,
+            fname="c_abs_data/graphite_cabs.fits",
+            override_path=internal_data_dir,
         )
         with fits.open(fits_path, mode="readonly") as hdul:
             # (1) rad_graphite (um), (2) wav_graphite (um), (3) cabs_graphite (cm**2)
@@ -101,7 +108,13 @@ class PahSpec:
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
         self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(internal_data_dir)
 
-    def generate_spectrum(self, wavelength_arr=None, u_lambda_arr=None, size_dist_neu=None, size_dist_ion=None):
+    def generate_spectrum(
+        self,
+        wavelength_arr=None,
+        u_lambda_arr=None,
+        size_dist_neu=None,
+        size_dist_ion=None,
+    ):
         """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
 
         Parameters
@@ -146,8 +159,14 @@ class PahSpec:
 
         basis_spectrum_unit = u.erg / (u.cm * u.s)
 
-        spectra_neu_a = np.zeros((len(self.grain_sizes), len(self.emission_wavelengths))) * basis_spectrum_unit
-        spectra_ion_a = np.zeros((len(self.grain_sizes), len(self.emission_wavelengths))) * basis_spectrum_unit
+        spectra_neu_a = (
+            np.zeros((len(self.grain_sizes), len(self.emission_wavelengths)))
+            * basis_spectrum_unit
+        )
+        spectra_ion_a = (
+            np.zeros((len(self.grain_sizes), len(self.emission_wavelengths)))
+            * basis_spectrum_unit
+        )
 
         # Check that that inputs for _scale_basis_spectra() have the expected units
         _check_param(self.photon_wavelengths, u.um, iterable=True)
@@ -242,7 +261,9 @@ class PahSpec:
             print(f"Path {output_directory} does not exist.")
             return None
 
-        photon_wavelengths = _generate_photon_wavelengths(_DELTA_LAMBDA, lambda_min, lambda_max)
+        photon_wavelengths = _generate_photon_wavelengths(
+            _DELTA_LAMBDA, lambda_min, lambda_max
+        )
 
         for grain_radius in grain_sizes:
             if not ion:
@@ -258,10 +279,17 @@ class PahSpec:
             # Get the PAH fundmanetal mode energies (in order of increasing energy)
             nc = _calc_nc(grain_radius)
             nh = _calc_nh(nc)
-            nm_cc_op = nc - 2  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energy
+            nm_cc_op = (
+                nc - 2
+            )  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energy
             nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
             _, pah_energy_modes = _calc_pah_energy_modes(
-                temp_arr=temp_arr, nc=nc, nh=nh, nm_cc_ip=nm_cc_ip, nm_cc_op=nm_cc_op, return_modes=True
+                temp_arr=temp_arr,
+                nc=nc,
+                nh=nh,
+                nm_cc_ip=nm_cc_ip,
+                nm_cc_op=nm_cc_op,
+                return_modes=True,
             )
 
             basis_dict = {}
@@ -279,9 +307,19 @@ class PahSpec:
 
             df = pd.DataFrame(basis_dict)
             if not ion:
-                df.to_pickle(os.path.join(output_directory, f"basis_neu_{grain_radius.to(u.AA).value:.3f}.pkl"))
+                df.to_pickle(
+                    os.path.join(
+                        output_directory,
+                        f"basis_neu_{grain_radius.to(u.AA).value:.3f}.pkl",
+                    )
+                )
             else:
-                df.to_pickle(os.path.join(output_directory, f"basis_ion_{grain_radius.to(u.AA).value:.3f}.pkl"))
+                df.to_pickle(
+                    os.path.join(
+                        output_directory,
+                        f"basis_ion_{grain_radius.to(u.AA).value:.3f}.pkl",
+                    )
+                )
 
         photon_wavelengths = [s.value for s in photon_wavelengths]
         emission_wavelengths = [s.value for s in emission_wavelengths]
@@ -328,10 +366,14 @@ class PahSpec:
         wavelength_unit, radius_unit = u.um, u.AA
 
         # ensure that wavelength and grain radius variables are array-like with correct units
-        wavelength_arr = _check_param(wavelength_arr, wavelength_unit, force_iterable=True)
+        wavelength_arr = _check_param(
+            wavelength_arr, wavelength_unit, force_iterable=True
+        )
         radius_arr = _check_param(radius_arr, radius_unit, force_iterable=True)
 
-        c_abs_ion_out, c_abs_neu_out = self._calc_c_abs(wavelength_arr.value, radius_arr.value)
+        c_abs_ion_out, c_abs_neu_out = self._calc_c_abs(
+            wavelength_arr.value, radius_arr.value
+        )
 
         return c_abs_ion_out * u.cm**2, c_abs_neu_out * u.cm**2
 
@@ -366,7 +408,9 @@ class PahSpec:
         hc[nc > 100] = 0.25
         xi_gra = np.zeros_like(radius_arr)
         xi_gra[radius_arr < 50] = 0.01
-        xi_gra[radius_arr >= 50] = 0.01 + 0.99 * (1.0 - (50 / radius_arr[radius_arr >= 50]) ** 3)
+        xi_gra[radius_arr >= 50] = 0.01 + 0.99 * (
+            1.0 - (50 / radius_arr[radius_arr >= 50]) ** 3
+        )
 
         def s_func(lam, lamj, gamma, sigma):
             num = 2 * gamma * lamj * sigma
@@ -388,7 +432,9 @@ class PahSpec:
 
         for i in range(len(radius_arr)):
             # cabs_graphite_spl expects units of um for both radius and wavelength parameters
-            graph_cont = self._cabs_graphite_spl.ev(radius_arr[i] * 0.0001, wavelength_arr)  # cm**2
+            graph_cont = self._cabs_graphite_spl.ev(
+                radius_arr[i] * 0.0001, wavelength_arr
+            )  # cm**2
             c_abs_ion_out[i, :] += xi_gra[i] * graph_cont  # cm**2
             c_abs_neu_out[i, :] += xi_gra[i] * graph_cont  # cm**2
 
@@ -405,10 +451,16 @@ class PahSpec:
                 if self._hc_tab[j] == 0:
                     # s_func param units: um -> cm, um -> cm, dimensionless, cm; units of s_func are cm**2
                     s_mat_neu[j, :] = s_func(
-                        wavelength_arr * 1e-4, self._lamj_tab[j] * 1e-4, self._gamj_tab[j], self._sigj_neu_tab[j]
+                        wavelength_arr * 1e-4,
+                        self._lamj_tab[j] * 1e-4,
+                        self._gamj_tab[j],
+                        self._sigj_neu_tab[j],
                     )
                     s_mat_ion[j, :] = s_func(
-                        wavelength_arr * 1e-4, self._lamj_tab[j] * 1e-4, self._gamj_tab[j], self._sigj_ion_tab[j]
+                        wavelength_arr * 1e-4,
+                        self._lamj_tab[j] * 1e-4,
+                        self._gamj_tab[j],
+                        self._sigj_ion_tab[j],
                     )
                 else:
                     s_mat_neu[j, :] = s_func(
@@ -425,8 +477,16 @@ class PahSpec:
                     )
 
             idx = np.where((10 < x) & (x < 15))
-            c_abs_ion_out[i, idx] += (s_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18) * nc[i] * (1.0 - xi_gra[i])
-            c_abs_neu_out[i, idx] += (s_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18) * nc[i] * (1.0 - xi_gra[i])
+            c_abs_ion_out[i, idx] += (
+                (s_mat_ion[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18)
+                * nc[i]
+                * (1.0 - xi_gra[i])
+            )
+            c_abs_neu_out[i, idx] += (
+                (s_mat_neu[0, idx] + (1.35 * x[idx] - 3.0) * 1.0e-18)
+                * nc[i]
+                * (1.0 - xi_gra[i])
+            )
 
             idx = np.where((7.7 < x) & (x <= 10))
             c_abs_ion_out[i, idx] += (
@@ -448,31 +508,67 @@ class PahSpec:
             c2 = 4.175e-19  # cm**2
             c3 = 4.37e-20  # cm**2, Note Equations A11 and A12 are mislabeled
             c_abs_ion_out[i, idx] += (
-                (s_mat_ion[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
+                (
+                    s_mat_ion[1, idx]
+                    + c0
+                    + c1 * x[idx]
+                    + c2 * (x[idx] - 5.9) ** 2
+                    + c3 * (x[idx] - 5.9) ** 3
+                )
                 * nc[i]
                 * (1.0 - xi_gra[i])
             )
             c_abs_neu_out[i, idx] += (
-                (s_mat_neu[1, idx] + c0 + c1 * x[idx] + c2 * (x[idx] - 5.9) ** 2 + c3 * (x[idx] - 5.9) ** 3)
+                (
+                    s_mat_neu[1, idx]
+                    + c0
+                    + c1 * x[idx]
+                    + c2 * (x[idx] - 5.9) ** 2
+                    + c3 * (x[idx] - 5.9) ** 3
+                )
                 * nc[i]
                 * (1.0 - xi_gra[i])
             )
 
             idx = np.where((3.3 < x) & (x <= 5.9))
-            c_abs_ion_out[i, idx] += (s_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
-            c_abs_neu_out[i, idx] += (s_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+            c_abs_ion_out[i, idx] += (
+                (s_mat_ion[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+            )
+            c_abs_neu_out[i, idx] += (
+                (s_mat_neu[1, idx] + c0 + c1 * x[idx]) * nc[i] * (1.0 - xi_gra[i])
+            )
 
             idx = np.where(x <= 3.3)
-            c_abs_ion_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_ion[idx] * nc[i] * (1.0 - xi_gra[i])
-            c_abs_neu_out[i, idx] += 34.58e-18 * 10 ** (-3.431 / x[idx]) * c_fac_neu[idx] * nc[i] * (1.0 - xi_gra[i])
+            c_abs_ion_out[i, idx] += (
+                34.58e-18
+                * 10 ** (-3.431 / x[idx])
+                * c_fac_ion[idx]
+                * nc[i]
+                * (1.0 - xi_gra[i])
+            )
+            c_abs_neu_out[i, idx] += (
+                34.58e-18
+                * 10 ** (-3.431 / x[idx])
+                * c_fac_neu[idx]
+                * nc[i]
+                * (1.0 - xi_gra[i])
+            )
 
             for j in range(len(self._lamj_tab)):
                 if j > 1:
-                    c_abs_ion_out[i, idx] += s_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
-                    c_abs_neu_out[i, idx] += s_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                    c_abs_ion_out[i, idx] += (
+                        s_mat_ion[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                    )
+                    c_abs_neu_out[i, idx] += (
+                        s_mat_neu[j, idx] * nc[i] * (1.0 - xi_gra[i])
+                    )
 
             c_abs_ion_out[i, idx] += (
-                3.5e-19 * 10 ** (-1.45 / x[idx]) * np.exp(-((0.1 * x[idx]) ** 2)) * nc[i] * (1.0 - xi_gra[i])
+                3.5e-19
+                * 10 ** (-1.45 / x[idx])
+                * np.exp(-((0.1 * x[idx]) ** 2))
+                * nc[i]
+                * (1.0 - xi_gra[i])
             )  # Note: does not appear in D21+
 
         return c_abs_ion_out, c_abs_neu_out
@@ -521,19 +617,31 @@ class PahSpec:
         # call calc_c_abs once for all wavelength values needed by calc_normalization
         lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
         if ion:
-            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[0][0]
+            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[
+                0
+            ][0]
             c_abs_phot_arr = np.concatenate(
                 [
-                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[0][0],
-                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[0][0],
+                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[
+                        0
+                    ][0],
+                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[
+                        0
+                    ][0],
                 ],
             )
         else:
-            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[1][0]
+            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[
+                1
+            ][0]
             c_abs_phot_arr = np.concatenate(
                 [
-                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[1][0],
-                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[1][0],
+                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[
+                        1
+                    ][0],
+                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[
+                        1
+                    ][0],
                 ],
             )
 
@@ -542,26 +650,36 @@ class PahSpec:
         for i, lambda_abs in enumerate(photon_wavelength_arr):
             # define wavelengths of monochromatic radiation field (MRF)
             lambda0, lambda1 = lambda_abs, lambda_abs + lambda_abs * dlambda
-            wh_mrf = np.where(np.logical_and(wavelength_arr_u > lambda0, wavelength_arr_u < lambda1))
-            wavelength_arr_mrf = np.concatenate([[lambda0], wavelength_arr_u[wh_mrf], [lambda1]])
+            wh_mrf = np.where(
+                np.logical_and(wavelength_arr_u > lambda0, wavelength_arr_u < lambda1)
+            )
+            wavelength_arr_mrf = np.concatenate(
+                [[lambda0], wavelength_arr_u[wh_mrf], [lambda1]]
+            )
 
             # get cross-section values of MRF
             wh0 = np.argmin(np.abs(lambda0 - photon_wavelength_arr))
             wh1 = np.argmin(np.abs(lambda1 - photon_wavelength_arr))
-            c_abs_arr_mrf = np.concatenate([[c_abs_phot_arr[wh0]], c_abs_arr_u[wh_mrf], [c_abs_phot_arr[wh1]]])
+            c_abs_arr_mrf = np.concatenate(
+                [[c_abs_phot_arr[wh0]], c_abs_arr_u[wh_mrf], [c_abs_phot_arr[wh1]]]
+            )
 
             # interpolate radiation field to the MRF wavelength range
-            u_lambda_arr_mrf = np.interp(wavelength_arr_mrf, wavelength_arr_u, u_lambda_arr)
+            u_lambda_arr_mrf = np.interp(
+                wavelength_arr_mrf, wavelength_arr_u, u_lambda_arr
+            )
 
             # integrate to determine the power of the radiation field in this wavelength range
             numerator = trapezoid(
                 u_lambda_arr_mrf * c_abs_arr_mrf * _C_CGS,
-                x=wavelength_arr_mrf * 1e-4,  # convert wavelength_arr_mrf from u.um to u.cm
+                x=wavelength_arr_mrf
+                * 1e-4,  # convert wavelength_arr_mrf from u.um to u.cm
             )
 
             # integrate to determine the power radiated by the grain over all wavelengths
             denominator = trapezoid(
-                p_lambda_arr[i], x=wavelength_arr * 1e-4  # convert wavelength_arr from u.um to u.cm
+                p_lambda_arr[i],
+                x=wavelength_arr * 1e-4,  # convert wavelength_arr from u.um to u.cm
             )
 
             normalizations[i] = numerator / denominator
@@ -667,21 +785,27 @@ def _calc_pah_energy_debye(temp_arr, nh, nm_cc_ip, nm_cc_op):
     y = exp(x)
     tmin = 32 * u.K
     energy_ch[temp_arr > tmin] += (
-        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
+        nh
+        * (k_B.cgs * temp_arr[temp_arr > tmin])
+        * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
 
     x = _THETA_IP_CH / temp_arr
     y = exp(x)
     tmin = 42 * u.K
     energy_ch[temp_arr > tmin] += (
-        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
+        nh
+        * (k_B.cgs * temp_arr[temp_arr > tmin])
+        * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
 
     x = _THETA_STR_CH / temp_arr
     y = exp(x)
     tmin = 109 * u.K
     energy_ch[temp_arr > tmin] += (
-        nh * (k_B.cgs * temp_arr[temp_arr > tmin]) * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
+        nh
+        * (k_B.cgs * temp_arr[temp_arr > tmin])
+        * (x[temp_arr > tmin] / (y[temp_arr > tmin] - 1))
     )
 
     # contributions from C-C modes (approximated as Debye spectrum)
@@ -762,7 +886,11 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
     for j in range(0, nmodes):
         x = emode_arr[j] / (k_B.cgs * temp_arr)
         y = exp(x)
-        energy_arr[x < exp_cutoff] += (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1)) * k_B.cgs * temp_arr[x < exp_cutoff]
+        energy_arr[x < exp_cutoff] += (
+            (x[x < exp_cutoff] / (y[x < exp_cutoff] - 1))
+            * k_B.cgs
+            * temp_arr[x < exp_cutoff]
+        )
 
     if return_modes:
         return energy_arr, emode_arr
@@ -770,7 +898,9 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
     return energy_arr
 
 
-def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr):
+def _calc_pah_cooling(
+    lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr
+):
     """Calculate the temperature evolution of a PAH following a single-photon absorption.
 
     Parameters
@@ -804,7 +934,13 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     TypeError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = u.um, u.AA, u.cm**2, u.erg, u.K
+    wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = (
+        u.um,
+        u.AA,
+        u.cm**2,
+        u.erg,
+        u.K,
+    )
     _check_param(lambda_abs, wavelength_unit)
     _check_param(grain_radius, radius_unit)
     _check_param(wavelength_arr, wavelength_unit, iterable=True)
@@ -826,7 +962,9 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
     dE_max = 0.03
 
     while temp_i.value > 5.1:
-        dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr)
+        dE_dt = -trapezoid(
+            4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr, x=nu_arr
+        )
 
         dt = dE_max * energy_i / dE_dt
         dE = dE_dt * dt
@@ -851,7 +989,13 @@ def _calc_pah_cooling(lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_
 
 
 def _calc_pah_cooling_discrete(
-    lambda_abs, grain_radius, wavelength_arr, c_abs_arr, temp_arr, energy_arr, pah_energy_modes
+    lambda_abs,
+    grain_radius,
+    wavelength_arr,
+    c_abs_arr,
+    temp_arr,
+    energy_arr,
+    pah_energy_modes,
 ):
     """Calculate the temperature evolution of a PAH following a single-photon absorption.
 
@@ -888,7 +1032,13 @@ def _calc_pah_cooling_discrete(
     TypeError
         If the astropy.units.Quantity object has incorrect units (or optionally is not array-like)
     """
-    wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = u.um, u.AA, u.cm**2, u.erg, u.K
+    wavelength_unit, radius_unit, c_abs_unit, energy_unit, temp_unit = (
+        u.um,
+        u.AA,
+        u.cm**2,
+        u.erg,
+        u.K,
+    )
     _check_param(lambda_abs, wavelength_unit)
     _check_param(grain_radius, radius_unit)
     _check_param(wavelength_arr, wavelength_unit, iterable=True)
@@ -939,7 +1089,14 @@ def _calc_pah_cooling_discrete(
     # Cache variables outside of loop to modify the final temperature bin before manually implementing temperature bins
     dE, dt, dE_dt = None, None, None
     while energy_i > energy_j_max[-1]:
-        dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr * weights_sawteeth, x=nu_arr)
+        dE_dt = -trapezoid(
+            4
+            * np.pi
+            * _planck_function_nu(nu_arr, temp_i)
+            * c_abs_arr
+            * weights_sawteeth,
+            x=nu_arr,
+        )
 
         dt = dE_max * energy_i / dE_dt
         dE = dE_dt * dt
@@ -974,7 +1131,14 @@ def _calc_pah_cooling_discrete(
     temp_arr_out[-1] = temp_i.value
 
     for j in range(nbins - 1, -1, -1):
-        dE_dt = -trapezoid(4 * np.pi * _planck_function_nu(nu_arr, temp_i) * c_abs_arr * weights_sawteeth, x=nu_arr)
+        dE_dt = -trapezoid(
+            4
+            * np.pi
+            * _planck_function_nu(nu_arr, temp_i)
+            * c_abs_arr
+            * weights_sawteeth,
+            x=nu_arr,
+        )
 
         dE = energy_j_max[j] - energy_j_min[j]
         dt = dE / dE_dt
@@ -1001,7 +1165,9 @@ def _calc_pah_cooling_discrete(
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
-def _calc_basis_vector(grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weighting_arr, temp_arr):
+def _calc_basis_vector(
+    grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weighting_arr, temp_arr
+):
     """Calculate the basis vector for a single-photon absorption.
 
     Parameters
@@ -1062,15 +1228,34 @@ def _calc_basis_vector(grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weig
 
 
 def _compute_basis_spectrum(
-    lambda_abs, grain_radius, emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes
+    lambda_abs,
+    grain_radius,
+    emission_wavelengths,
+    c_abs_arr,
+    temp_arr,
+    energy_arr,
+    pah_energy_modes,
 ):
     dt_arr, _, temp_arr_t = _calc_pah_cooling_discrete(
-        lambda_abs, grain_radius.to(u.AA), emission_wavelengths, c_abs_arr, temp_arr, energy_arr, pah_energy_modes
+        lambda_abs,
+        grain_radius.to(u.AA),
+        emission_wavelengths,
+        c_abs_arr,
+        temp_arr,
+        energy_arr,
+        pah_energy_modes,
     )
     temp_arr_t = temp_arr_t[0:-1]  # temperatures of the top edges of each energy bin
     temp_weights = dt_arr / np.sum(dt_arr)
 
-    return _calc_basis_vector(grain_radius, lambda_abs, emission_wavelengths, c_abs_arr, temp_weights, temp_arr_t)
+    return _calc_basis_vector(
+        grain_radius,
+        lambda_abs,
+        emission_wavelengths,
+        c_abs_arr,
+        temp_weights,
+        temp_arr_t,
+    )
 
 
 def _calc_nh(nc):
@@ -1118,10 +1303,14 @@ def _calc_cc_mode_energies(nc, nm, theta):
     _check_param(theta, u.K)
     mode_energy_arr = np.zeros((nm)) * u.erg
     # beta = calc_beta(nc, nc - 2)  # note that we are intentionally using the same beta for C-C ip and op modes
-    beta = _calc_beta(nc, nm)  # note that we are intentionally using the same beta for C-C ip and op modes
+    beta = _calc_beta(
+        nc, nm
+    )  # note that we are intentionally using the same beta for C-C ip and op modes
 
     for j in range(1, nm + 1):
-        mode_energy_arr[j - 1] = k_B.cgs * theta * np.sqrt((1 - beta) * (j - _calc_delta_j(j)) / nm + beta)
+        mode_energy_arr[j - 1] = (
+            k_B.cgs * theta * np.sqrt((1 - beta) * (j - _calc_delta_j(j)) / nm + beta)
+        )
 
     return mode_energy_arr
 
@@ -1138,7 +1327,10 @@ def _calc_ch_mode_energies(nh, theta):
 def _debye_2(x):
     """As implemented in lines 28-29 of debye.f"""
     x2 = x * x
-    return (2 / x2) * (2 * 1.20206 - x2 * exp(-x) * (1 + 2 / x + 2 / x2 + exp(-x) * (0.5 + 0.5 / x + 0.25 / x2)))
+    return (2 / x2) * (
+        2 * 1.20206
+        - x2 * exp(-x) * (1 + 2 / x + 2 / x2 + exp(-x) * (0.5 + 0.5 / x + 0.25 / x2))
+    )
 
 
 def _check_param(param, unit, iterable=False, force_iterable=False):
@@ -1193,7 +1385,11 @@ def _planck_function_nu(nu, T):
 def _planck_function_lambd(lambd, T):
     _check_param(lambd, u.cm)
     _check_param(T, u.K)
-    return (2 * h.cgs * c.cgs**2 / lambd**5) * 1 / (np.exp(h.cgs * c.cgs / (lambd * k_B.cgs * T)) - 1)
+    return (
+        (2 * h.cgs * c.cgs**2 / lambd**5)
+        * 1
+        / (np.exp(h.cgs * c.cgs / (lambd * k_B.cgs * T)) - 1)
+    )
 
 
 def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
@@ -1213,7 +1409,9 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
 
 def _read_size_dist(internal_data_dir=None):
     path = build_data_file_path(
-        kind=DataKind.INTERNAL_DATA, fname="defaults/pahspec_dnda.out_st_std", override_path=internal_data_dir
+        kind=DataKind.INTERNAL_DATA,
+        fname="defaults/pahspec_dnda.out_st_std",
+        override_path=internal_data_dir,
     )
 
     df = pd.read_csv(path, sep="\\s+", skiprows=1)
@@ -1226,7 +1424,9 @@ def _read_size_dist(internal_data_dir=None):
 
 def _read_radiation_field(internal_data_dir=None):
     path = build_data_file_path(
-        kind=DataKind.INTERNAL_DATA, fname="defaults/isrf_mmpisrf_0.00", override_path=internal_data_dir
+        kind=DataKind.INTERNAL_DATA,
+        fname="defaults/isrf_mmpisrf_0.00",
+        override_path=internal_data_dir,
     )
 
     df = pd.read_csv(path, sep="\\s+", skiprows=6)
@@ -1242,6 +1442,8 @@ def _size_integrate(grain_sizes, scaled_basis_spectra, size_dist):
     for i, _ in enumerate(grain_sizes):
         weighted_spectra[i] = size_dist[i] * scaled_basis_spectra[i].value
 
-    size_integrated_spectrum = np.sum(np.array(weighted_spectra), axis=0) * scaled_basis_spectra.unit
+    size_integrated_spectrum = (
+        np.sum(np.array(weighted_spectra), axis=0) * scaled_basis_spectra.unit
+    )
 
     return size_integrated_spectrum
