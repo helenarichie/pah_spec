@@ -5,8 +5,10 @@
 # - tools like setuptools, flit, scikit-build-core, meson-python are all
 #   examples of build backends
 requires = [
-    # the version bound follows modern conventions for license & license-files
-    "hatchling>=1.26",
+  # the version bound follows modern conventions for license & license-files
+  "hatchling>=1.26",
+  # a plugin that infers the version number from git tags
+  "hatch-vcs",
 ]
 build-backend = "hatchling.build"
 
@@ -71,11 +73,25 @@ docs = [
 test = ["pytest"]
 dev = [{include-group = "docs"}, {include-group = "test"}]
 
-[tool.hatch.version]
-# provide instructions to the build-backend about where it should search for
-# the version number
-path = "src/pah_spec/_version.py"
-pattern = '__version__: str = "(?P<version>[^"]+)"'
+# hatch-specific instructions
+[tool.hatch]
+version.source = "vcs"
+# the build-system automatically generates a file with the following name
+# that includes the version
+build.hooks.vcs.version-file = "src/pah_spec/_version.py"
+
+[tool.hatch.build.targets.sdist]
+# explicitly include the _version.py file in a sdist. It is dynamically created
+# by hooks during the build-process. (We need to explicitly include it since its
+# in our .gitignore file, which hatch uses for determining sdist contents)
+artifacts = ["src/pah_spec/_version.py"]
+
+[tool.hatch.build.targets.wheel]
+# explicitly include the _version.py file in a wheel. It is dynamically created
+# by hooks during the build-process. (We need to explicitly include it since its
+# in our .gitignore file, which hatch uses for determining wheel contents)
+artifacts = ["src/pah_spec/_version.py"]
+
 
 # configure pytest
 [tool.pytest.ini_options]
