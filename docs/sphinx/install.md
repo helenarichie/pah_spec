@@ -92,7 +92,7 @@ In both cases ``<KIND>`` should be either ``sample_basis`` or ``internal_data``.
 :::
 :::{tab} programmatically
 
-You can use the :py:func:`pah_spec.retrieve_internal_data` and :py:func:`pah_spec.retrieve_sample_basis` functions
+You can use the {py:func}`pah_spec.retrieve_internal_data` and {py:func}`pah_spec.retrieve_sample_basis` functions
 By default, each function will try to install the data to the appropriate data cache.
 You can overwrite the destination with the ``path`` kwarg.
 :::
@@ -103,7 +103,7 @@ No matter what approach you take,
 - the installation logic will not initiate a download of a file if a file already exists at the output location (and errors will be raised an existing file has the wrong checksum).
 
 :::{warning}
-You should generally try to avoid using the capability to specify an arbitrary path to specify a path to a cache directory
+You should generally try to avoid using the capability to specify an arbitrary path to manually specify the path to the default cache directory (in other words, if you want to use the default cache directory, don't specify an arbitrary path).
 :::
 
 :::{note}
