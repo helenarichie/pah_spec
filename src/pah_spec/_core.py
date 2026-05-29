@@ -14,6 +14,8 @@ import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
+import time
+
 from ._data import DataKind, build_data_file_path
 from ._version import version as __version__
 
@@ -48,9 +50,23 @@ class PahSpec:
         None (the default), these files are read from the appropriate data cache
         directory. This is mostly provided for testing purposes (and should NOT
         be considered part of the public API)
+    c_abs_func : callable, optional
+        Function to calculate absorption cross-sections. Must have the same signature as
+        PahSpec.calc_c_abs(wavelength_arr, radius_arr). Defaults to PahSpec.calc_c_abs.
+    pah_energy_func : callable, optional
+        Function to calculate PAH vibrational energy as a function of temperature. Must
+        have the same signature as calc_pah_energy(grain_radius, temp_arr). Defaults to
+        calc_pah_energy.
     """
 
-    def __init__(self, *, basis_dir=None, internal_data_dir=None):
+    def __init__(
+        self,
+        *,
+        basis_dir=None,
+        internal_data_dir=None,
+        c_abs_func=None,
+        pah_energy_func=None,
+    ):
         # Load the basis spectra into memory
         _data = {}
         _dset_unit_pairs = [
@@ -59,19 +75,33 @@ class PahSpec:
             ("basis_spectra", "erg/(s*cm)"),
             ("grain_sizes", "Angstrom"),
         ]
+        _header_attrs = {}
+        _header_keywords = ["pah_energy_func", "c_abs_func"]
         for fname in ["basis_ion.h5", "basis_neu.h5"]:
             path = build_data_file_path(
                 kind=DataKind.SAMPLE_BASIS, fname=fname, override_path=basis_dir
             )
             _data[fname] = {"path": path}
+            _header_attrs[fname] = {}
             with h5py.File(path, "r") as f:
                 for dset, unit in _dset_unit_pairs:
                     _data[fname][dset] = u.Quantity(f[dset][...], unit=unit)
+                for kw in _header_keywords:
+                    _header_attrs[fname][kw] = f.attrs[kw]
 
         for dset in ("lambda_em", "lambda_abs", "grain_sizes"):
             if not np.all(_data["basis_ion.h5"][dset] == _data["basis_neu.h5"][dset]):
                 raise ValueError(
                     f"the {dset} datasets in {_data['basis_ion.h5']['path']!s} and "
+                    f"{_data['basis_neu.h5']['path']!s} are not identical"
+                )
+
+        for kw in _header_keywords:
+            if not np.all(
+                _header_attrs["basis_ion.h5"][kw] == _header_attrs["basis_neu.h5"][kw]
+            ):
+                raise ValueError(
+                    f"the {kw} header attributes in {_data['basis_ion.h5']['path']!s} and "
                     f"{_data['basis_neu.h5']['path']!s} are not identical"
                 )
 
@@ -81,7 +111,53 @@ class PahSpec:
         self.basis_spectra_ion = _data["basis_ion.h5"]["basis_spectra"]
         self.basis_spectra_neu = _data["basis_neu.h5"]["basis_spectra"]
 
-        # Load the cross section data into memory, TODO: should these be private attributes?
+        energy_funcs = [
+            _header_attrs[f]["pah_energy_func"]
+            for f in ["basis_ion.h5", "basis_neu.h5"]
+        ]
+        c_abs_funcs = [
+            _header_attrs[f]["c_abs_func"] for f in ["basis_ion.h5", "basis_neu.h5"]
+        ]
+
+        # If basis spectra were generated using a custom energy/c_abs function, ensure PahSpec is initialized with custom energy/c_abs function (and vice versa)
+        if "custom" in energy_funcs and pah_energy_func is None:
+            raise ValueError(
+                "Basis spectra were computed with a custom PAH energy function, but pah_energy_func was not specified."
+            )
+        if "custom" in c_abs_funcs and c_abs_func is None:
+            raise ValueError(
+                "Basis spectra were computed with a custom cross section function, but c_abs_func was not specified."
+            )
+        if "default" in energy_funcs and pah_energy_func is not None:
+            raise ValueError(
+                "To use custom pah_energy_func, basis spectra must be computed with the same custom pah_energy_func."
+            )
+        if "default" in c_abs_funcs and c_abs_func is not None:
+            raise ValueError(
+                "To use custom c_abs_func, basis spectra must be computed with the same custom c_abs_func."
+            )
+
+        self.pah_energy_func_str = energy_funcs[0]
+        self.c_abs_func_str = c_abs_funcs[0]
+
+        # Set PAH energy and cross section functions
+        if pah_energy_func is None:
+            self.pah_energy_func = calc_pah_energy
+        else:
+            self.pah_energy_func = pah_energy_func
+            print(
+                "PahSpec object successfully initialized with custom PAH energy function"
+            )
+
+        if c_abs_func is None:
+            self.c_abs_func = self.calc_c_abs
+        else:
+            self.c_abs_func = c_abs_func
+            print(
+                "PahSpec object successfully initialized with custom cross section function"
+            )
+
+        # Load the cross section data into memory
         # _lamj_tab units are um
         draine_table_path = build_data_file_path(
             kind=DataKind.INTERNAL_DATA,
@@ -225,6 +301,7 @@ class PahSpec:
         ion=False,
         lambda_min=0.0912 * u.um,
         lambda_max=10 * u.um,
+        pah_mode_energy_func=None,
     ):
         """Generates basis spectra file for input grain sizes for an ionized or neutral PAHs.
 
@@ -244,16 +321,25 @@ class PahSpec:
             Lowest lambda_abs wavelength, recommended default is 912 A
         lambda_max : astropy.units.Quantity, optional
             Highest lambda_abs wavelength, recommended default is 10 um
+        pah_mode_energy_func : callable, optional
+            Function to calculate PAH vibrational mode energies as a function of grain size.
+            Must accept the grain radius as an argument and return an ordered list of PAH vibrational
+            mode energies (in ascending order) in ergs. Defaults to _calc_pah_energy_modes.
+
 
         Returns
         -------
         None
         """
-        # TODO: add cross-section argument
         grain_sizes = _check_param(grain_sizes, u.AA, force_iterable=True)
         _check_param(lambda_min, u.um)
         _check_param(lambda_max, u.um)
         _check_param(emission_wavelengths, u.um, iterable=True)
+
+        if self.pah_energy_func_str == "custom" and pah_mode_energy_func is None:
+            raise AttributeError(
+                "pah_mode_energy_func must be specified when using a custom pah_energy_func."
+            )
 
         if not os.path.exists(output_directory):
             print(f"Path {output_directory} does not exist.")
@@ -280,6 +366,8 @@ class PahSpec:
                     f"PAH basis spectra ({ionization}) generated by pah_spec"
                 )
                 f.attrs["ionization_state"] = ionization
+                f.attrs["c_abs_func"] = self.c_abs_func_str
+                f.attrs["pah_energy_func"] = self.pah_energy_func_str
                 f.attrs["pah_spec_version"] = __version__
                 f.attrs["created"] = datetime.datetime.now().isoformat()
                 f.attrs["reference"] = "Richie & Hensley (in prep.); arXiv:2510.16861v2"
@@ -316,32 +404,36 @@ class PahSpec:
             print("Appending to existing file.")
 
         for a, grain_radius in enumerate(grain_sizes):
+            time0 = time.time()
             if not ion:
-                c_abs = self.calc_c_abs(emission_wavelengths, grain_radius)[1][0]
+                c_abs = self.c_abs_func(emission_wavelengths, grain_radius)[1][0]
                 print(f"C_abs computed for PAH0 of size {grain_radius:.2f}")
             else:
-                c_abs = self.calc_c_abs(emission_wavelengths, grain_radius)[0][0]
+                c_abs = self.c_abs_func(emission_wavelengths, grain_radius)[0][0]
                 print(f"C_abs computed for PAH+ of size {grain_radius:.2f}")
 
             temp_arr = np.linspace(0, 5e3, 10000) * u.K
-            energy_arr = calc_pah_energy(grain_radius, temp_arr)
+            energy_arr = self.pah_energy_func(grain_radius, temp_arr)
 
-            # Get the PAH fundmanetal mode energies (in order of increasing energy)
-            nc = _calc_nc(grain_radius)
-            nh = _calc_nh(nc)
-            nm_cc_op = (
-                nc - 2
-            )  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energy
-            nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
-            _, pah_energy_modes = _calc_pah_energy_modes(
-                temp_arr=temp_arr.value,
-                nc=nc,
-                nh=nh,
-                nm_cc_ip=nm_cc_ip,
-                nm_cc_op=nm_cc_op,
-                return_modes=True,
-            )
-            pah_energy_modes *= u.erg
+            pah_energy_modes = None
+            if pah_mode_energy_func is None:
+                # Get the PAH fundmanetal mode energies (in order of increasing energy)
+                nc = _calc_nc(grain_radius)
+                nh = _calc_nh(nc)
+                nm_cc_op = (
+                    nc - 2
+                )  # total number of C-C out-of-plane modes, should match definitions in calc_pah_energy
+                nm_cc_ip = 2 * (nc - 2)  # total number of C-C in-plane modes
+                _, pah_energy_modes = _calc_pah_energy_modes(
+                    temp_arr=temp_arr.value,
+                    nc=nc,
+                    nh=nh,
+                    nm_cc_ip=nm_cc_ip,
+                    nm_cc_op=nm_cc_op,
+                )
+                pah_energy_modes *= u.erg
+            else:
+                pah_energy_modes = pah_mode_energy_func(grain_radius)
 
             basis_spectra_a = (
                 np.zeros((len(photon_wavelengths), len(emission_wavelengths)))
@@ -357,6 +449,7 @@ class PahSpec:
                     c_abs,
                     temp_arr,
                     energy_arr,
+                    self.pah_energy_func,
                     pah_energy_modes,
                 )
 
@@ -366,7 +459,7 @@ class PahSpec:
             ) as f:
                 f["basis_spectra"][a] = basis_spectra_a.value
 
-        return None
+            print(f"grain radius: {grain_radius}, time: ", time.time() - time0)
 
     def calc_c_abs(self, wavelength_arr, radius_arr):
         """Calculate the absorption cross-section, C_abs, for input grain sizes and wavelengths based on method from
@@ -635,31 +728,31 @@ class PahSpec:
         # call calc_c_abs once for all wavelength values needed by calc_normalization
         lambda1_max = photon_wavelength_arr[-1] + photon_wavelength_arr[-1] * dlambda
         if ion:
-            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[
-                0
-            ][0]
+            c_abs_arr_u = self.c_abs_func(
+                wavelength_arr_u * u.um, np.array([grain_radius]) * u.AA
+            )[0][0].value
             c_abs_phot_arr = np.concatenate(
                 [
-                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[
-                        0
-                    ][0],
-                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[
-                        0
-                    ][0],
+                    self.c_abs_func(
+                        photon_wavelength_arr * u.um, np.array([grain_radius]) * u.AA
+                    )[0][0].value,
+                    self.c_abs_func(
+                        np.array([lambda1_max]) * u.um, np.array([grain_radius]) * u.AA
+                    )[0][0].value,
                 ],
             )
         else:
-            c_abs_arr_u = self._calc_c_abs(wavelength_arr_u, np.array([grain_radius]))[
-                1
-            ][0]
+            c_abs_arr_u = self.c_abs_func(
+                wavelength_arr_u * u.um, np.array([grain_radius]) * u.AA
+            )[1][0].value
             c_abs_phot_arr = np.concatenate(
                 [
-                    self._calc_c_abs(photon_wavelength_arr, np.array([grain_radius]))[
-                        1
-                    ][0],
-                    self._calc_c_abs(np.array([lambda1_max]), np.array([grain_radius]))[
-                        1
-                    ][0],
+                    self.c_abs_func(
+                        photon_wavelength_arr * u.um, np.array([grain_radius]) * u.AA
+                    )[1][0].value,
+                    self.c_abs_func(
+                        np.array([lambda1_max]) * u.um, np.array([grain_radius]) * u.AA
+                    )[1][0].value,
                 ],
             )
 
@@ -771,7 +864,7 @@ def _calc_pah_energy(grain_radius, temp_arr):
     # modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
-        energy_arr = _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op)
+        energy_arr, _ = _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op)
 
     return energy_arr
 
@@ -838,7 +931,7 @@ def _calc_pah_energy_debye(temp_arr, nh, nm_cc_ip, nm_cc_op):
     return energy_arr
 
 
-def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=False):
+def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op):
     """Calculate PAH energy using eq. 2 of Draine & Li (2001).
 
     Parameters
@@ -860,9 +953,9 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
     -------
     energy_arr : astropy.units.Quantity (array_like)
         Resulting PAH energy array (in u.erg)
+    emode_arr : astropy.units.Quantity (array_like)
+        Energies of all PAH vibrational modes in order of increasing energy (in u.erg)
     """
-    # TODO: consider creating a function specifically for the calculation of the vibrational mode energies and removing
-    # the return_modes argument
     mode_arr_cc_op = _calc_cc_mode_energies(nc, nm_cc_op, _THETA_OP_CC)
     mode_arr_cc_ip = _calc_cc_mode_energies(nc, nm_cc_ip, _THETA_IP_CC)
     mode_arr_ch_op = _calc_ch_mode_energies(nh, _THETA_OP_CH)
@@ -897,10 +990,7 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, return_modes=Fa
             * temp_arr[x < exp_cutoff]
         )
 
-    if return_modes:
-        return energy_arr, emode_arr
-
-    return energy_arr
+    return energy_arr, emode_arr
 
 
 def _calc_pah_cooling_discrete(
@@ -959,7 +1049,7 @@ def _calc_pah_cooling_discrete(
     energy_abs = c.cgs * h.cgs / lambda_abs.to(u.cm)
     temp_abs = np.interp(energy_abs.value, energy_arr.value, temp_arr.value) * u.K
 
-    print(f"Photon wavelength: {lambda_abs:.2f}, initial temperature: {temp_abs:.2f}")
+    # print(f"Photon wavelength: {lambda_abs:.2f}, initial temperature: {temp_abs:.2f}")
 
     time_i, energy_i, temp_i = 0 * u.s, energy_abs, temp_abs
     time_arr_out, temp_arr_out, dt_arr_out = [0], [temp_i.value], []
@@ -1068,13 +1158,19 @@ def _calc_pah_cooling_discrete(
     time_arr_out = np.array(time_arr_out) * time_unit
     temp_arr_out = np.array(temp_arr_out) * temp_unit
 
-    print(f"Final temperature of {temp_arr_out[-1]:.2f} at time {time_arr_out[-1]:.2e}")
+    # print(f"Final temperature of {temp_arr_out[-1]:.2f} at time {time_arr_out[-1]:.2e}")
 
     return dt_arr_out, time_arr_out, temp_arr_out
 
 
 def _calc_basis_vector(
-    grain_radius, lambda_abs, wavelength_arr, c_abs_arr, weighting_arr, temp_arr
+    grain_radius,
+    lambda_abs,
+    wavelength_arr,
+    c_abs_arr,
+    weighting_arr,
+    temp_arr,
+    pah_energy_func,
 ):
     """Calculate the basis vector for a single-photon absorption.
 
@@ -1092,15 +1188,17 @@ def _calc_basis_vector(
         Dimensionless array of length len(temp_arr) with values to weight temperatures by
     temp_arr : numpy.ndarray
         Array with temperature values for T(t) (upper energy bin edges only, in Kelvin)
+    pah_energy_func : callable
+        Function for calculating the PAH energy as a function of grain size and temperature
 
     Returns
     -------
     basis_vector : numpy.ndarray
         Array of floats of length len(wavelength_arr) with basis vector for a given grain (in erg / (cm * s))
     """
-    weighting_energy_arr = _calc_pah_energy(
-        grain_radius=grain_radius, temp_arr=temp_arr
-    )  # erg
+    weighting_energy_arr = pah_energy_func(
+        grain_radius=grain_radius * u.AA, temp_arr=temp_arr * u.K
+    ).value  # erg
 
     basis_vector = np.zeros(len(wavelength_arr))
     for i, lambda_i in enumerate(wavelength_arr):
@@ -1127,6 +1225,7 @@ def _compute_basis_spectrum(
     c_abs_arr,
     temp_arr,
     energy_arr,
+    pah_energy_func,
     pah_energy_modes,
 ):
     dt_arr, _, temp_arr_t = _calc_pah_cooling_discrete(
@@ -1156,6 +1255,7 @@ def _compute_basis_spectrum(
             c_abs_arr.value,
             temp_weights.value,
             temp_arr_t.value,
+            pah_energy_func,
         )
         * u.erg
         / (u.cm * u.s)
