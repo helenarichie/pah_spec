@@ -403,10 +403,14 @@ class PahSpec:
 
         for a, grain_radius in enumerate(grain_sizes):
             if not ion:
-                c_abs = self.c_abs_func(emission_wavelengths, grain_radius)[1][0]
+                c_abs = self.c_abs_func(
+                    emission_wavelengths, [grain_radius.value] * grain_radius.unit
+                )[1][0]
                 print(f"C_abs computed for PAH0 of size {grain_radius:.2f}")
             else:
-                c_abs = self.c_abs_func(emission_wavelengths, grain_radius)[0][0]
+                c_abs = self.c_abs_func(
+                    emission_wavelengths, [grain_radius.value] * grain_radius.unit
+                )[0][0]
                 print(f"C_abs computed for PAH+ of size {grain_radius:.2f}")
 
             temp_arr = np.linspace(0, 5e3, 10000) * u.K
