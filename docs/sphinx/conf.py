@@ -22,6 +22,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx_inline_tabs",
+    "sphinx.ext.mathjax",
 ]
 source_suffix = [".rst", ".md"]
 
@@ -61,4 +62,4 @@ intersphinx_disabled_reftypes = ["*"]
 
 # -- Options for MyST --------------------------------------------------------
 
-myst_enable_extensions = ["colon_fence", "fieldlist"]
+myst_enable_extensions = ["colon_fence", "fieldlist", "dollarmath"]
