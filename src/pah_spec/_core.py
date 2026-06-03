@@ -199,7 +199,8 @@ class PahSpec:
         size_dist_neu=None,
         size_dist_ion=None,
     ):
-        """Scale the basis spectra for ionized and neutral PAHs to an input radiation field.
+        """Scale the basis spectra for ionized and neutral PAHs to an input radiation field and integrate
+        over the size distribution.
 
         Parameters
         ----------
@@ -234,6 +235,37 @@ class PahSpec:
         _check_param(wavelength_arr, u.um)
         _check_param(u_lambda_arr, u.erg / u.cm**4)
 
+        spectra_neu_a, spectra_ion_a = self.generate_spectra_per_grain(
+            wavelength_arr, u_lambda_arr
+        )
+
+        spectrum_neu = _size_integrate(self.grain_sizes, spectra_neu_a, size_dist_neu)
+        spectrum_ion = _size_integrate(self.grain_sizes, spectra_ion_a, size_dist_ion)
+
+        return spectrum_neu, spectrum_ion
+
+    def generate_spectra_per_grain(self, wavelength_arr, u_lambda_arr):
+        """Scale the basis spectra for ionized and neutral PAHs to an input radiation field
+
+        Parameters
+        ----------
+        wavelength_arr : astropy.units.Quantity (array_like), optional
+            Wavelength array for the radiation field u_lambda (in u.um)
+        u_lambda_arr : astropy.units.Quantity (array_like), optional
+            Array of length len(wavelength_arr) with the radiation field (in u.erg / u.cm ** 4)
+
+        Returns
+        -------
+        spectra_neu_a : astropy.units.Quantity (array-like)
+            Array of spectra for neutral PAHs in response to radiation field, with dimensions
+            (len(grain_sizes), len(emission_wavelengths)) in u.erg / (u.cm * u.s)
+        spectra_ion_a : astropy.units.Quantity (array-like)
+            Array of spectra for ionized PAHs in response to radiation field, with dimensions
+            (len(grain_sizes), len(emission_wavelengths)) in u.erg / (u.cm * u.s)
+        """
+        _check_param(wavelength_arr, u.um)
+        _check_param(u_lambda_arr, u.erg / u.cm**4)
+
         basis_spectrum_unit = u.erg / (u.cm * u.s)
 
         spectra_neu_a = (
@@ -254,7 +286,7 @@ class PahSpec:
         _check_param(self.basis_spectra_ion, basis_spectrum_unit, iterable=True)
 
         for i, grain_radius in enumerate(self.grain_sizes):
-            # Remove units from arguments to call _scale_basis_spectra()
+            # Remove units from arguments to call _scale_basis_spectra() (for performance reasons)
             spectra_neu_a[i] = (
                 np.sum(
                     self._scale_basis_spectra(
@@ -286,10 +318,7 @@ class PahSpec:
                 )
             ) * basis_spectrum_unit  # manually set units of the function output
 
-        spectrum_neu = _size_integrate(self.grain_sizes, spectra_neu_a, size_dist_neu)
-        spectrum_ion = _size_integrate(self.grain_sizes, spectra_ion_a, size_dist_ion)
-
-        return spectrum_neu, spectrum_ion
+        return spectra_neu_a, spectra_ion_a
 
     def generate_basis_spectra(
         self,
