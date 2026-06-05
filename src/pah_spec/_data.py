@@ -105,19 +105,19 @@ _POOCH_MAP: MappingProxyType[DataKind, pooch.Pooch] = MappingProxyType(
             # - if you forget to update the version number, then cache paths may be
             #   accidently reused for different versions of a file (if you try to
             #   download data using different versions of pah_spec)
-            version="3.0",
+            version="4.0",
             # users can use this environment variable to specify a custom location that
             # overwrides the path kwarg
             env="PAHSPEC_SAMPLEBASIS_DIR",
             # files (and checksums) managed by the constructed instance
             registry={
-                "basis_ion.h5": "sha256:3dacf4d4e0377200ec56ed2e63c2aa3afe774296f59f6858c6a8cde007d74536",
-                "basis_neu.h5": "sha256:eab4f4e072e27ed17f08e0834e8c2245acf7930d5dbbef308e1b7e096aa9b052",
+                "basis_ion.h5": "sha256:8ac9e685b56afa15bb80185b5fb46ec9688056a32d63ac10e929924e36303adb",
+                "basis_neu.h5": "sha256:3f1a02cd9dae135d6cd9c0b49a93b6b84c39b888bdaa9a89a69b9183d01fc3b3",
             },
             # here we specify custom URLs for each file
             urls={
-                "basis_ion.h5": "https://dataverse.harvard.edu/api/access/datafile/13869504",
-                "basis_neu.h5": "https://dataverse.harvard.edu/api/access/datafile/13869503",
+                "basis_ion.h5": "https://dataverse.harvard.edu/api/access/datafile/13967678",
+                "basis_neu.h5": "https://dataverse.harvard.edu/api/access/datafile/13967679",
             },
             # we're being a little conservative here (I suspect this choice is better
             # for parallelized calculations on shared file systems), but I don't think

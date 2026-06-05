@@ -20,6 +20,7 @@
    install
    api
    development
+   customization
 
 .. toctree::
    :caption: Useful links
@@ -27,6 +28,7 @@
 
    GitHub <https://github.com/helenarichie/pah_spec>
    Issue Tracker <https://github.com/helenarichie/pah_spec/issues>
+   Examples <https://github.com/helenarichie/pah_spec/tree/main/examples>
 
 .. Down below we describe information for the landing page of the website.
 
