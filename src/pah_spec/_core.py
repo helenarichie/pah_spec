@@ -185,7 +185,8 @@ class PahSpec:
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
-        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
+        # _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
+        self.size_dist_neu, self.size_dist_ion = calc_dn(self.grain_sizes)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
         self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(
@@ -414,9 +415,9 @@ class PahSpec:
                 )
 
                 f["basis_spectra"].attrs["units"] = "erg / (s cm)"
-                f["basis_spectra"].attrs["dimensions"] = (
-                    "(n_grains, n_lambda_abs, n_lambda_em)"
-                )
+                f["basis_spectra"].attrs[
+                    "dimensions"
+                ] = "(n_grains, n_lambda_abs, n_lambda_em)"
 
                 f["lambda_abs"].attrs["units"] = "microns"
                 f["lambda_abs"].attrs["description"] = "Absorbed photon wavelengths"
@@ -839,6 +840,71 @@ def calc_pah_energy(grain_radius, temp_arr):
     energy_arr = _calc_pah_energy(grain_radius.value, temp_arr.value) * u.erg
 
     return energy_arr
+
+
+def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
+    _check_param(grain_sizes, u.AA)
+
+    # The size distributions/ionization functions used in Draine et al. (2021)
+    if size_dist not in ["st", "sm", "lg"]:
+        raise ValueError(
+            f"{size_dist} is not a valid option for size_dist. available options are: 'st', 'sm', 'lg'"
+        )
+
+    if ion_frac not in ["st", "lo", "hi"]:
+        raise ValueError(
+            f"{ion_frac} is not a valid option for ion_frac. available options are: 'st', 'lo', 'hi'"
+        )
+
+    sigma = 0.40
+
+    a0 = [0, 30] * u.AA
+    b = [0, 3.113e-10]
+    if size_dist == "st":
+        a0[0] = 4.0 * u.AA
+        b[0] = 6.134e-7
+    elif size_dist == "sm":
+        a0[0] = 3.0 * u.AA
+        b[0] = 18.80e-7
+    elif size_dist == "lg":
+        a0[0] = 5.0 * u.AA
+        b[0] = 2.893e-7
+
+    a_h = None
+    if ion_frac == "st":
+        a_h = 10 * u.AA
+    elif ion_frac == "lo":
+        a_h = 5 * u.AA
+    elif ion_frac == "hi":
+        a_h = 20 * u.AA
+
+    amin = 4.0 * u.AA
+    amax = 100.0 * u.AA
+
+    # units are 1 / (Angstrom * H atom)
+    dnda = np.zeros(len(grain_sizes)) / u.AA
+
+    # Equation 15 of Draine et al. (2021)
+    for j in range(0, 2):
+        dnda += (
+            b[j]
+            / grain_sizes
+            * np.exp(-np.log(grain_sizes / a0[j]) ** 2 / (2 * sigma**2))
+        )
+
+    wh_zero = np.where(np.logical_and(grain_sizes < amin, grain_sizes > amax))
+    dnda[wh_zero] = 0
+
+    dlna = np.log(grain_sizes[-1] / grain_sizes[0]) / len(grain_sizes)
+    dn = dnda * grain_sizes * dlna
+
+    f_ion = 1 - 1 / (1 + grain_sizes / a_h)
+
+    dn_neu = (1 - f_ion) * dn
+    dn_ion = f_ion * dn
+
+    return dn_neu, dn_ion
+    # return dnda
 
 
 def _calc_pah_energy(grain_radius, temp_arr):
