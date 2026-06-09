@@ -11,7 +11,7 @@ cross-sections (:py:func:`calc_pah_energy` and :py:meth:`PahSpec.calc_c_abs`, re
 and Draine et al. (2021).
 """
 
-from ._core import PahSpec, calc_pah_energy, calc_pah_mode_energies
+from ._core import PahSpec, calc_dn, calc_pah_energy, calc_pah_mode_energies
 from ._data import retrieve_internal_data, retrieve_sample_basis
 
 # we consider __version__ to be a public name, but we don't list it the __all__
@@ -21,6 +21,7 @@ from ._version import __version__ as __version__
 
 __all__ = [
     "PahSpec",
+    "calc_dn",
     "calc_pah_energy",
     "calc_pah_mode_energies",
     "retrieve_internal_data",

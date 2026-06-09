@@ -17,7 +17,7 @@ from scipy import interpolate
 from ._data import DataKind, build_data_file_path
 from ._version import version as __version__
 
-__all__ = ["PahSpec", "calc_pah_energy", "calc_pah_mode_energies"]
+__all__ = ["PahSpec", "calc_dn", "calc_pah_energy", "calc_pah_mode_energies"]
 
 
 _DELTA_LAMBDA = 0.01
@@ -185,8 +185,8 @@ class PahSpec:
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
-        # _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
-        self.size_dist_neu, self.size_dist_ion = calc_dn(self.grain_sizes)
+        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
+        # self.size_dist_neu, self.size_dist_ion = calc_dn(self.grain_sizes)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
         self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(
@@ -878,21 +878,23 @@ def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
     elif ion_frac == "hi":
         a_h = 20 * u.AA
 
-    amin = 4.0 * u.AA
+    # setting amin to 3.981 instead of 4.0 to see if rounding 3.981 -> 4.0 is causing discrepancy
+    # amin = 4.0 * u.AA
+    amin = 3.981 * u.AA
     amax = 100.0 * u.AA
 
     # units are 1 / (Angstrom * H atom)
     dnda = np.zeros(len(grain_sizes)) / u.AA
 
-    # Equation 15 of Draine et al. (2021)
-    for j in range(0, 2):
+    # Equation 15 of Draine et al. (2021), grain_sizes matches D21 dnda datafile exactly
+    for j in range(2):
         dnda += (
             b[j]
             / grain_sizes
             * np.exp(-np.log(grain_sizes / a0[j]) ** 2 / (2 * sigma**2))
         )
 
-    wh_zero = np.where(np.logical_and(grain_sizes < amin, grain_sizes > amax))
+    wh_zero = np.where((grain_sizes < amin) | (grain_sizes > amax))
     dnda[wh_zero] = 0
 
     dlna = np.log(grain_sizes[-1] / grain_sizes[0]) / len(grain_sizes)
@@ -903,8 +905,8 @@ def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
     dn_neu = (1 - f_ion) * dn
     dn_ion = f_ion * dn
 
-    return dn_neu, dn_ion
-    # return dnda
+    # return dn_neu, dn_ion
+    return dnda
 
 
 def _calc_pah_energy(grain_radius, temp_arr):
