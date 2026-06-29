@@ -843,9 +843,9 @@ def calc_pah_energy(grain_radius, temp_arr):
 
 
 def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
+    """Assumes size bins are uniform in log(a) between amin and amax."""
     _check_param(grain_sizes, u.AA)
 
-    # The size distributions/ionization functions used in Draine et al. (2021)
     if size_dist not in ["st", "sm", "lg"]:
         raise ValueError(
             f"{size_dist} is not a valid option for size_dist. available options are: 'st', 'sm', 'lg'"
@@ -878,10 +878,10 @@ def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
     elif ion_frac == "hi":
         a_h = 20 * u.AA
 
-    # setting amin to 3.981 instead of 4.0 to see if rounding 3.981 -> 4.0 is causing discrepancy
-    # amin = 4.0 * u.AA
-    amin = 3.981 * u.AA
-    amax = 100.0 * u.AA
+    dlna = np.log(grain_sizes[-1] / grain_sizes[0]) / len(grain_sizes)
+
+    amin = 3.98 * u.AA  # note: slightly different than D21
+    amax = 100 * u.AA
 
     # units are 1 / (Angstrom * H atom)
     dnda = np.zeros(len(grain_sizes)) / u.AA
@@ -894,19 +894,88 @@ def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
             * np.exp(-np.log(grain_sizes / a0[j]) ** 2 / (2 * sigma**2))
         )
 
-    wh_zero = np.where((grain_sizes < amin) | (grain_sizes > amax))
-    dnda[wh_zero] = 0
+    dn = dnda * (grain_sizes.value * dlna)
 
-    dlna = np.log(grain_sizes[-1] / grain_sizes[0]) / len(grain_sizes)
-    dn = dnda * grain_sizes * dlna
+    factor1 = np.exp(0.5 * dlna)
+    for i, grain_radius in enumerate(grain_sizes):
+        # Values below amin and above amax do not contribute to the size distribution
+        if grain_radius < amin or grain_radius > amax:
+            dn[i] = 0.0
+        else:
+            ra = grain_radius.value / factor1
+            rb = grain_radius.value * factor1
+            # fraction of bin within [amin, amax]
+            ln_ra = max(np.log(ra), np.log(amin.value))
+            ln_rb = min(np.log(rb), np.log(amax.value))
+            fraction = (ln_rb - ln_ra) / dlna
+            if fraction < 1.0:
+                dn[i] *= fraction
 
     f_ion = 1 - 1 / (1 + grain_sizes / a_h)
-
     dn_neu = (1 - f_ion) * dn
     dn_ion = f_ion * dn
 
-    # return dn_neu, dn_ion
-    return dnda
+    return dn_neu, dn_ion
+
+
+def calc_dnda_lognormal(grain_sizes, a0, grvolh, sigma, dlna, amin, amax):
+    """Compute dn per bin using 3-point Simpson's rule, matching Fortran idist=4."""
+
+    pah_volume_1 = 3.196e-28  # note: slightly different than D21
+    pah_volume_2 = 0.7e-28
+
+    factor1 = np.exp(0.5 * dlna)
+    factor2 = np.exp(1.5 * dlna)
+    factor3 = 0.5 / sigma**2
+
+    # Normalization: sum over all bins to match total grain volume grvolh
+    # using three-point Simpson's rule to get total mass
+    a1 = 0.0
+    for grain_radius in grain_sizes:
+        q_exp = factor3 * np.log(grain_radius / a0) ** 2
+        if q_exp < 100.0:
+            ra = grain_radius / factor1
+            rb = grain_radius * factor1
+            q = (
+                np.exp(-factor3 * np.log(ra / a0) ** 2) / factor2
+                + 4.0 * np.exp(-factor3 * np.log(grain_radius / a0) ** 2)
+                + factor2 * np.exp(-factor3 * np.log(rb / a0) ** 2)
+            )
+            a1 += q * grain_radius**3
+
+    a1 = a1 * dlna * 4.0 * np.pi / 18.0
+    a1 = 1e24 * grvolh / a1  # 1e24 converts cm³ -> Å³
+
+    # Compute dngr per bin
+    dngr = np.zeros(len(grain_sizes))
+    for i, grain_radius in enumerate(grain_sizes):
+        q_exp = factor3 * np.log(grain_radius / a0) ** 2
+        if q_exp < 100.0:
+            ra = grain_radius / factor1
+            rb = grain_radius * factor1
+            q = (
+                np.exp(-factor3 * np.log(ra / a0) ** 2) / factor2
+                + 4.0 * np.exp(-factor3 * np.log(grain_radius / a0) ** 2)
+                + factor2 * np.exp(-factor3 * np.log(rb / a0) ** 2)
+            )
+            dngr[i] = q * dlna * a1 / 6.0
+
+    # After computing dngr, correct the boundary bins
+    for i, grain_radius in enumerate(grain_sizes):
+        # Values below amin and above amax do not contribute to the size distribution
+        if grain_radius < amin or grain_radius > amax:
+            dngr[i] = 0.0
+        else:
+            ra = grain_radius / factor1
+            rb = grain_radius * factor1
+            # fraction of bin within [amin, amax]
+            ln_ra = max(np.log(ra), np.log(amin))
+            ln_rb = min(np.log(rb), np.log(amax))
+            fraction = (ln_rb - ln_ra) / dlna
+            if fraction < 1.0:
+                dngr[i] *= fraction
+
+    return dngr
 
 
 def _calc_pah_energy(grain_radius, temp_arr):
