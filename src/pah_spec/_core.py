@@ -1009,7 +1009,7 @@ def _calc_pah_energy(grain_radius, temp_arr):
     # modes
     # Eq. 2 of Draine & Li (2001)
     if nc <= nc_cutoff:
-        energy_arr, _ = _calc_pah_energy_modes(
+        energy_arr = _calc_pah_energy_modes(
             temp_arr, nc, nh, nm_cc_ip, nm_cc_op, grain_radius
         )
 
@@ -1124,7 +1124,7 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, grain_radius):
         Energies of all PAH vibrational modes in order of increasing energy (in u.erg)
     """
 
-    emode_arr = calc_pah_mode_energies(grain_radius)
+    emode_arr = _calc_pah_mode_energies(grain_radius)
 
     nmodes = len(emode_arr)
 
