@@ -413,9 +413,9 @@ class PahSpec:
                 )
 
                 f["basis_spectra"].attrs["units"] = "erg / (s cm)"
-                f["basis_spectra"].attrs[
-                    "dimensions"
-                ] = "(n_grains, n_lambda_abs, n_lambda_em)"
+                f["basis_spectra"].attrs["dimensions"] = (
+                    "(n_grains, n_lambda_abs, n_lambda_em)"
+                )
 
                 f["lambda_abs"].attrs["units"] = "microns"
                 f["lambda_abs"].attrs["description"] = "Absorbed photon wavelengths"
