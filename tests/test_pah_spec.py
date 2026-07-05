@@ -12,8 +12,8 @@ import pah_spec  # pylint: disable=wrong-import-position
 
 _INTERNAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
-# Set tolerance for disagreement to 5%
-TOLERANCE = 0.05
+# Set tolerance for disagreement to 1%
+TOLERANCE = 0.01
 
 
 @dataclass
@@ -69,6 +69,13 @@ def test_total_power(basic_scenario: Scenario):
         x=basic_scenario.golden_wavelength_arr.to(u.cm),
     )
 
+    print(
+        f"PAH0 spectral power: expected {expected_power_neu:.3e}, actual {actual_power_neu:.3e}"
+    )
+    print(
+        f"PAH+ spectral power: expected {expected_power_ion:.3e}, actual {actual_power_ion:.3e}"
+    )
+
     np.testing.assert_allclose(
         actual_power_neu.value,
         desired=expected_power_neu.value,
@@ -101,7 +108,18 @@ def test_spectral_shape(basic_scenario: Scenario):
         actual_spectrum_neu.value,
         basic_scenario.golden_wavelength_arr.value,
         basic_scenario.golden_spectrum_neu.value,
-    ), "PAH0 spectra disagree"
+    ), (
+        f"More than {TOLERANCE * 100}% of PAH0 spectrum disagrees with golden by over {TOLERANCE * 100}%"
+    )
+
+    assert compare_spectra(
+        ps.emission_wavelengths.value,
+        actual_spectrum_ion.value,
+        basic_scenario.golden_wavelength_arr.value,
+        basic_scenario.golden_spectrum_ion.value,
+    ), (
+        f"More than {TOLERANCE * 100}% of PAH+ spectrum disagrees with golden by over {TOLERANCE * 100}%"
+    )
 
 
 def compare_spectra(x_actual, y_actual, x_golden, y_golden):
@@ -143,6 +161,6 @@ def compare_spectra(x_actual, y_actual, x_golden, y_golden):
         for a, b in zip(y_actual_interp, y_golden_interp)
     )
 
-    outlier_fraction = 0.05
+    print(f"n_outliers / n_points in spectrum: {n_outliers / n_points:.5f}")
 
-    return (n_outliers / n_points) <= outlier_fraction
+    return (n_outliers / n_points) <= TOLERANCE
