@@ -6,7 +6,7 @@ Currently, you **MUST** install this package from source.
 We describe two approaches down below.
 
 Each approach will automatically install ``pah_spec``'s dependencies (please open an issue if you encounter a version incompatability).
-For context, most development has used python 3.13.7, h5py 3.14.0, astropy 6.1.2, numpy 2.3.2, pandas 2.3.2, and scipy 1.16.1.
+For context, most development has used python 3.13.7, h5py 3.14.0, astropy 6.1.2, numpy 2.3.2, and scipy 1.16.1.
 
 ### Easy Approach (for normal users)
 

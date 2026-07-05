@@ -47,7 +47,6 @@ classifiers = [
 dependencies = [
   'astropy',
   'numpy',
-  'pandas',
   'scipy >= 1.6.0',
   'h5py',
   # we may need to bumpy the lower limit

@@ -10,14 +10,13 @@ import datetime
 import h5py
 import numpy as np
 from numpy import exp
-import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
 from ._data import DataKind, build_data_file_path
 from ._version import version as __version__
 
-__all__ = ["PahSpec", "calc_pah_energy", "calc_pah_mode_energies"]
+__all__ = ["PahSpec", "calc_dn", "calc_pah_energy", "calc_pah_mode_energies"]
 
 
 _DELTA_LAMBDA = 0.01
@@ -185,7 +184,7 @@ class PahSpec:
 
         # Load the default size distribution and ionization function into memory (std. dn/da, st. f_ion;
         # Draine et al. 2021)
-        _, self.size_dist_neu, self.size_dist_ion = _read_size_dist(internal_data_dir)
+        self.size_dist_neu, self.size_dist_ion = calc_dn(self.grain_sizes)
 
         # Load the default radiation field into memory (U=1 mMMP ISRF; Draine 2011)
         self.wavelength_u_arr, self.u_lambda_arr = _read_radiation_field(
@@ -841,6 +840,104 @@ def calc_pah_energy(grain_radius, temp_arr):
     return energy_arr
 
 
+def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
+    """Calculates the size distribution dn for ionized and neutral PAHs, following the definitions in
+    Sections 6.1 and 6.2 of Draine et al. (2021).
+
+    Parameters
+    ----------
+    grain_sizes : astropy.units.Quantity (array-like)
+        Array of grain sizes to compute size distribution for, uniformly spaced in log(grain_sizes)
+    size_dist : str, optional
+        Specifies the PAH sizes. Options are "sm", "st" (default), and "lg".
+    ion_frac : str, optional
+        Specifies the fraction of ionized/neutral PAHs. Options are "lo", "st" (default), and "hi".
+
+    Returns
+    -------
+    dn_neu : astropy.units.Quantity (array-like)
+        The number of neutral PAHs in each size bin (in units of 1 / H atom)
+    dn_ion : astropy.units.Quantity (array-like)
+        The number of ionized PAHs in each size bin (in units of 1 / H atom)
+    """
+    _check_param(grain_sizes, u.AA)
+
+    if size_dist not in ["st", "sm", "lg"]:
+        raise ValueError(
+            f"{size_dist} is not a valid option for size_dist. available options are: 'st', 'sm', 'lg'"
+        )
+
+    if ion_frac not in ["st", "lo", "hi"]:
+        raise ValueError(
+            f"{ion_frac} is not a valid option for ion_frac. available options are: 'st', 'lo', 'hi'"
+        )
+
+    sigma = 0.40
+
+    a0 = [0, 30] * u.AA
+    b = [0, 3.113e-10]
+    if size_dist == "st":
+        a0[0] = 4.0 * u.AA
+        b[0] = 6.134e-7
+    elif size_dist == "sm":
+        a0[0] = 3.0 * u.AA
+        b[0] = 18.80e-7
+    elif size_dist == "lg":
+        a0[0] = 5.0 * u.AA
+        b[0] = 2.893e-7
+
+    a_h = None
+    if ion_frac == "st":
+        a_h = 10 * u.AA
+    elif ion_frac == "lo":
+        a_h = 20 * u.AA
+    elif ion_frac == "hi":
+        a_h = 5 * u.AA
+
+    dlna = np.log(grain_sizes[-1] / grain_sizes[0]) / len(grain_sizes)
+
+    amin = 3.981 * u.AA  # note: intentionally different than amin defined in D21 paper
+    amax = 100 * u.AA
+
+    # units are 1 / (Angstrom * H atom)
+    dnda = np.zeros(len(grain_sizes)) / u.AA
+
+    # Equation 15 of Draine et al. (2021), grain_sizes matches D21 dnda datafile exactly
+    for j in range(2):
+        dnda += (
+            b[j]
+            / grain_sizes
+            * np.exp(-(np.log(grain_sizes / a0[j]) ** 2) / (2 * sigma**2))
+        )
+
+    dn = dnda * (grain_sizes * dlna)
+
+    edge_factor = np.exp(0.5 * dlna)
+
+    # Effective amin/amax accounting for Draine grid bin width
+    for i, grain_radius in enumerate(grain_sizes):
+        # Values below amin and above amax do not contribute to the size distribution
+        if grain_radius < amin or grain_radius > amax:
+            dn[i] = 0.0
+        else:
+            ra = grain_radius / edge_factor
+            rb = grain_radius * edge_factor
+            # fraction of bin within [amin, amax]
+            ln_ra = max(np.log(ra / u.AA), np.log(amin / u.AA))
+            ln_rb = min(np.log(rb / u.AA), np.log(amax / u.AA))
+
+            fraction = (ln_rb - ln_ra) / dlna
+            if round(fraction.value, 1) < 1.0:
+                dn[i] *= fraction
+
+    # calculate the fraction of ionized/neutral grains
+    f_ion = 1 - 1 / (1 + grain_sizes / a_h)
+    dn_neu = (1 - f_ion) * dn
+    dn_ion = f_ion * dn
+
+    return dn_neu, dn_ion
+
+
 def _calc_pah_energy(grain_radius, temp_arr):
     """Calculate PAH vibrational energy as a function of temperature.
 
@@ -1457,21 +1554,6 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     return photon_wavelengths
 
 
-def _read_size_dist(internal_data_dir=None):
-    path = build_data_file_path(
-        kind=DataKind.INTERNAL_DATA,
-        fname="defaults/pahspec_dnda.out_st_std",
-        override_path=internal_data_dir,
-    )
-
-    df = pd.read_csv(path, sep="\\s+", skiprows=1)
-    rad = df["rad"].to_numpy() * u.um
-    size_dist_neu = df["dn_{PAH0}"].to_numpy()
-    size_dist_ion = df["dn_{PAH+}"].to_numpy()
-
-    return rad, size_dist_neu, size_dist_ion
-
-
 def _read_radiation_field(internal_data_dir=None):
     path = build_data_file_path(
         kind=DataKind.INTERNAL_DATA,
@@ -1479,9 +1561,9 @@ def _read_radiation_field(internal_data_dir=None):
         override_path=internal_data_dir,
     )
 
-    df = pd.read_csv(path, sep="\\s+", skiprows=6)
-    wavelength_arr_u = df["(um)"].to_numpy() * u.um
-    u_lambda_arr = df["(erg"].to_numpy() * (u.erg / u.cm**3) / wavelength_arr_u.to(u.cm)
+    data = np.genfromtxt(path, skip_header=7, dtype=float)
+    wavelength_arr_u = data[:, 0] * u.um
+    u_lambda_arr = data[:, 1] * (u.erg / u.cm**3) / wavelength_arr_u.to(u.cm)
 
     return wavelength_arr_u, u_lambda_arr
 
