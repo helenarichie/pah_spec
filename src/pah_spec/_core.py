@@ -10,7 +10,6 @@ import datetime
 import h5py
 import numpy as np
 from numpy import exp
-import pandas as pd
 from scipy.integrate import trapezoid
 from scipy import interpolate
 
@@ -908,24 +907,27 @@ def calc_dn(grain_sizes, size_dist="st", ion_frac="st"):
         dnda += (
             b[j]
             / grain_sizes
-            * np.exp(-np.log(grain_sizes / a0[j]) ** 2 / (2 * sigma**2))
+            * np.exp(-(np.log(grain_sizes / a0[j]) ** 2) / (2 * sigma**2))
         )
 
     dn = dnda * (grain_sizes * dlna)
 
     edge_factor = np.exp(0.5 * dlna)
+
+    # Effective amin/amax accounting for Draine grid bin width
     for i, grain_radius in enumerate(grain_sizes):
         # Values below amin and above amax do not contribute to the size distribution
         if grain_radius < amin or grain_radius > amax:
             dn[i] = 0.0
         else:
-            ra = grain_radius.value / edge_factor
-            rb = grain_radius.value * edge_factor
+            ra = grain_radius / edge_factor
+            rb = grain_radius * edge_factor
             # fraction of bin within [amin, amax]
-            ln_ra = max(np.log(ra), np.log(amin.value))
-            ln_rb = min(np.log(rb), np.log(amax.value))
+            ln_ra = max(np.log(ra / u.AA), np.log(amin / u.AA))
+            ln_rb = min(np.log(rb / u.AA), np.log(amax / u.AA))
+
             fraction = (ln_rb - ln_ra) / dlna
-            if fraction < 1.0:
+            if round(fraction.value, 1) < 1.0:
                 dn[i] *= fraction
 
     # calculate the fraction of ionized/neutral grains
@@ -1552,21 +1554,6 @@ def _generate_photon_wavelengths(dlambda, lambda_min, lambda_max):
     return photon_wavelengths
 
 
-def _read_size_dist(internal_data_dir=None):
-    path = build_data_file_path(
-        kind=DataKind.INTERNAL_DATA,
-        fname="defaults/pahspec_dnda.out_st_std",
-        override_path=internal_data_dir,
-    )
-
-    df = pd.read_csv(path, sep="\\s+", skiprows=1)
-    rad = df["rad"].to_numpy() * u.um
-    size_dist_neu = df["dn_{PAH0}"].to_numpy()
-    size_dist_ion = df["dn_{PAH+}"].to_numpy()
-
-    return rad, size_dist_neu, size_dist_ion
-
-
 def _read_radiation_field(internal_data_dir=None):
     path = build_data_file_path(
         kind=DataKind.INTERNAL_DATA,
@@ -1574,9 +1561,9 @@ def _read_radiation_field(internal_data_dir=None):
         override_path=internal_data_dir,
     )
 
-    df = pd.read_csv(path, sep="\\s+", skiprows=6)
-    wavelength_arr_u = df["(um)"].to_numpy() * u.um
-    u_lambda_arr = df["(erg"].to_numpy() * (u.erg / u.cm**3) / wavelength_arr_u.to(u.cm)
+    data = np.genfromtxt(path, skip_header=7, dtype=float)
+    wavelength_arr_u = data[:, 0] * u.um
+    u_lambda_arr = data[:, 1] * (u.erg / u.cm**3) / wavelength_arr_u.to(u.cm)
 
     return wavelength_arr_u, u_lambda_arr
 
