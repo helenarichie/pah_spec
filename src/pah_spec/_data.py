@@ -1,18 +1,18 @@
 """
 Logic for retrieving the data files
 """
-
-from ._version import __version__
+from __future__ import annotations
 
 import enum
 import functools
 import os
 import pathlib
 from types import MappingProxyType
-from typing import Any, Optional, TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Any
 
 import pooch
+
+from ._version import __version__
 
 if TYPE_CHECKING:
     import argparse.Namespace as argparse_Namespace
@@ -133,7 +133,7 @@ _POOCH_MAP: MappingProxyType[DataKind, pooch.Pooch] = MappingProxyType(
 _DOWNLOADER = pooch.HTTPDownloader(headers={"User-Agent": "Mozilla/5.0"})
 
 def _retrieve_data(
-    *, path: Optional[os.PathLike], kind: DataKind, progressbar: Any = None
+    *, path: os.PathLike | None, kind: DataKind, progressbar: Any = None
 ):
     """
     Internal function that tries to retrieve all files in the specified data collection
@@ -199,7 +199,7 @@ retrieve_sample_basis.__doc__ = _DOCSTRING_TEMPLATE.format(descr="sample basis s
 
 
 def build_data_file_path(
-    kind: DataKind, fname: str, override_path: Optional[os.PathLike] = None
+    kind: DataKind, fname: str, override_path: os.PathLike | None = None
 ) -> pathlib.Path:
     """
     Internal function that constructs the path to a file based
