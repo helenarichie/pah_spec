@@ -127,6 +127,10 @@ _POOCH_MAP: MappingProxyType[DataKind, pooch.Pooch] = MappingProxyType(
     }
 )
 
+# Dataverse (and possibly other hosts) reject requests with the default
+# requests/urllib3 User-Agent string, returning 403 Forbidden. A standard
+# browser-like User-Agent avoids this.
+_DOWNLOADER = pooch.HTTPDownloader(headers={"User-Agent": "Mozilla/5.0"})
 
 def _retrieve_data(
     *, path: Optional[os.PathLike], kind: DataKind, progressbar: Any = None
@@ -162,6 +166,7 @@ def _retrieve_data(
             fname=fname,
             path=pooch_obj.path if path is None else path,
             progressbar=progressbar,
+            downloader=_DOWNLOADER,
         )
 
 
