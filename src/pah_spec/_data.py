@@ -1,6 +1,7 @@
 """
 Logic for retrieving the data files
 """
+
 from __future__ import annotations
 
 import enum
@@ -131,6 +132,7 @@ _POOCH_MAP: MappingProxyType[DataKind, pooch.Pooch] = MappingProxyType(
 # requests/urllib3 User-Agent string, returning 403 Forbidden. A standard
 # browser-like User-Agent avoids this.
 _DOWNLOADER = pooch.HTTPDownloader(headers={"User-Agent": "Mozilla/5.0"})
+
 
 def _retrieve_data(
     *, path: os.PathLike | None, kind: DataKind, progressbar: Any = None
