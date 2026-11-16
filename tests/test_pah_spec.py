@@ -1,11 +1,10 @@
-from math import isclose
 import os
 from dataclasses import dataclass
+from math import isclose
 
 import astropy.units as u
 import numpy as np
 import pytest
-
 from scipy.integrate import trapezoid
 
 import pah_spec  # pylint: disable=wrong-import-position

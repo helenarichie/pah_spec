@@ -1,5 +1,6 @@
 import argparse
 import sys
+
 from ._data import add_data_cli_subcommands
 
 
