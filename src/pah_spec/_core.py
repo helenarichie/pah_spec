@@ -2,16 +2,17 @@
 Implements core logic
 """
 
-import os
-from astropy.constants import c, h, k_B
-from astropy.io import fits
-import astropy.units as u
 import datetime
+import os
+
+import astropy.units as u
 import h5py
 import numpy as np
+from astropy.constants import c, h, k_B
+from astropy.io import fits
 from numpy import exp
-from scipy.integrate import trapezoid
 from scipy import interpolate
+from scipy.integrate import trapezoid
 
 from ._data import DataKind, build_data_file_path
 from ._version import version as __version__
@@ -369,7 +370,7 @@ class PahSpec:
 
         if not os.path.exists(output_directory):
             print(f"Path {output_directory} does not exist.")
-            return None
+            return
 
         # generate array of lambda_abs absorbed photon wavelengths with constant spacing of _DELTA_LAMBDA
         # (dlambda / lambda = _DELTA_LAMBDA)
@@ -1094,7 +1095,7 @@ def _calc_pah_energy_modes(temp_arr, nc, nh, nm_cc_ip, nm_cc_op, grain_radius):
 
     # emodes array contains mode energies from C-C in-plane and out-of-plane bending and C-H stretching and in-plane
     # in-plane and out-of-plane bending
-    for j in range(0, nmodes):
+    for j in range(nmodes):
         x = emode_arr[j] / (_KB_CGS * temp_arr)
         y = exp(x)
         energy_arr[x < exp_cutoff] += (
@@ -1181,7 +1182,7 @@ def _calc_pah_cooling_discrete(
     energy_j_max[0] = energy_j_min[1]
 
     # Eq. B2
-    for j in range(0, 2):
+    for j in range(2):
         bin_edge = 1 / 2 * (pah_energy_modes[j] + pah_energy_modes[j + 1])
         energy_j_max[j] = bin_edge
         energy_j_min[j + 1] = bin_edge
@@ -1454,7 +1455,7 @@ def _calc_pah_mode_energies(grain_radius):
 
 def _calc_cc_mode_energies(nc, nm, theta):
     """As implemented in lines 141-154 and 158-165 of pah_modes.f"""
-    mode_energy_arr = np.zeros((nm))  # erg
+    mode_energy_arr = np.zeros(nm)  # erg
     beta = _calc_beta(
         nc, nm
     )  # note that we are intentionally using the same beta for C-C ip and op modes
@@ -1469,7 +1470,7 @@ def _calc_cc_mode_energies(nc, nm, theta):
 
 def _calc_ch_mode_energies(nh, theta):
     """As implemented in lines 170-184 of pah_modes.f"""
-    mode_energy_arr = np.zeros((nh))  # erg
+    mode_energy_arr = np.zeros(nh)  # erg
     mode_energy_arr[:] = _KB_CGS * theta
 
     return mode_energy_arr
